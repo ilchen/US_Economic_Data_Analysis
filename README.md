@@ -6,6 +6,14 @@ So far I created the following notebooks:
 * [Analysis of evolution of the seasonally adjusted CPI, Fed Funds Effective Rate, and Market Yield on U.S. Treasury Securities at 10-Year Constant Maturity](./CPI_and_Fed_Funds_Rates.ipynb)
 * [Analysis of evolution of the US Federal Public Debt as percentage of GDP, Public Debt as percentage of Federal annual tax revenue, and Annual pulic deficit as percentage of GDP](./Fed_Public_Debt_and_Fed_Tax_Revenue.ipynb)
 
+## Requirements
+You'll need python3 and pip. `brew install python` will do if you are on MacOS. You can even forgo installing anything and run these notebooks in Google cloud, as I outline below.
+
+In case you opt for a local installation, the rest of the dependencies can be installed as follows:
+```commandline
+python3 -m pip install -r requirements.txt
+```
+
 ## How to run
 ```commandline
 jupyter notebook CPI_and_Fed_Funds_Rates.ipynb
