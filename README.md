@@ -15,9 +15,12 @@ python3 -m pip install -r requirements.txt
 ```
 
 ## How to run
+After you clone the repo and `cd` into its directory:
 ```commandline
 jupyter notebook CPI_and_Fed_Funds_Rates.ipynb
+```
 or
+```commandline
 jupyter notebook Fed_Public_Debt_and_Fed_Tax_Revenue.ipynb
 ```
 A full run of these notebooks can be seen [here for CPI](https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/CPI_and_Fed_Funds_Rates.ipynb) and
