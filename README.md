@@ -30,5 +30,7 @@ You can also run these notebooks in Google cloud. This way you don't need to ins
 1. Go to [Google Colaboratory](https://colab.research.google.com/notebooks/intro.ipynb#recent=true) in your browser
 2. In the modal window that appears select `GitHub`
 3. Enter the URL of this repository's notebook, e.g.: `https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/Fed_Public_Debt_and_Fed_Tax_Revenue.ipynb`
-4. Click the search icon
-5. Enjoy
+or
+`https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/CPI_and_Fed_Funds_Rates.ipynb`
+5. Click the search icon
+6. Enjoy
