@@ -3,9 +3,9 @@ This repository contains Jupyter notebooks that visually analyze US Economic dat
 The analysis is carried out using [Pandas](https://pandas.pydata.org), [Pandas datareader](https://pydata.github.io/pandas-datareader/), and [Matplotlib](https://matplotlib.org/stable/index.html).
 
 So far I created the following notebooks:
-* [Analysis of evolution of the seasonally adjusted CPI, Fed Funds Effective Rate, and Market Yield on U.S. Treasury Securities at 10-Year Constant Maturity](./CPI_and_Fed_Funds_Rates.ipynb)
-* [Analysis of evolution of the US Federal Public Debt as percentage of GDP, Public Debt as percentage of Federal annual tax revenue, and Annual pulic deficit as percentage of GDP](./Fed_Public_Debt_and_Fed_Tax_Revenue.ipynb)
-* [Analysis of evolution of the ownership structure of US Federal Debt](./Fed_Public_Debt_Holders.ipynb)
+* [Analysis of the evolution of the seasonally adjusted CPI, Fed Funds Effective Rate, and Market Yield on U.S. Treasury Securities at 10-Year Constant Maturity](./CPI_and_Fed_Funds_Rates.ipynb)
+* [Analysis of the evolution of the US Federal Public Debt as percentage of GDP, Public Debt as percentage of Federal annual tax revenue, Annual pulic deficit as percentage of GDP, and interest outlays to tax revenues](./Fed_Public_Debt_and_Fed_Tax_Revenue.ipynb)
+* [Analysis of the evolution of the ownership structure of US Federal Debt](./Fed_Public_Debt_Holders.ipynb)
 
 ## Requirements
 You'll need python3 and pip. `brew install python` will do if you are on MacOS. You can even forgo installing anything and run these notebooks in Google cloud, as I outline below.
