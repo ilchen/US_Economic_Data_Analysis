@@ -6,6 +6,7 @@ So far I created the following notebooks:
 * [Analysis of the evolution of the seasonally adjusted CPI, Fed Funds Effective Rate, Market Yield on U.S. Treasury Securities at 10-Year Constant Maturity, and comparison of the present US Treasury Yield Curve with Annual Inflation Expectations](./CPI_and_Fed_Funds_Rates.ipynb)
 * [Analysis of the evolution of the US Federal Public Debt as percentage of GDP, Public Debt as percentage of Federal annual tax revenue, Annual pulic deficit as percentage of GDP, and interest outlays to tax revenues](./Fed_Public_Debt_and_Fed_Tax_Revenue.ipynb)
 * [Analysis of the evolution of the ownership structure of US Federal Debt](./Fed_Public_Debt_Holders.ipynb)
+* [Analysis of changes in Real M2, Personal Consumption Expenditures (PCE), and CPI](./M2_PCE_and_CPI.ipynb)
 
 ## Requirements
 You'll need python3 and pip. `brew install python` will do if you are on MacOS. You can even forgo installing anything and run these notebooks in Google cloud, as I outline below.
