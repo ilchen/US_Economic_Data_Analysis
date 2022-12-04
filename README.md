@@ -8,6 +8,7 @@ So far I created the following notebooks:
 * [Analysis of the evolution of the ownership structure of US Federal Debt](./Fed_Public_Debt_Holders.ipynb)
 * [Analysis of changes in M2, Real Personal Consumption Expenditures (PCE), Wage Inflation and CPI](./M2_PCE_and_CPI.ipynb)
 * [Analysis of Participation, Employment to Population, Unemployment, and Unfilled Vacancies to Population Rates](./Unemployment_and_Participation_Rates.ipynb)
+* [Analysis of US Money Supply](./Money_Supply.ipynb)
 
 ## Requirements
 You'll need python3 and pip. `brew install python` will do if you are on MacOS. You can even forgo installing anything and run these notebooks in Google cloud, as I outline below.
@@ -38,12 +39,17 @@ or
 ```commandline
 jupyter notebook Unemployment_and_Participation_Rates.ipynb
 ```
+or
+```commandline
+jupyter notebook Money_Supply.ipynb
+```
 
 A full run of these notebooks can be seen [here for CPI, Fed Funds Rate, Treasury rates and Inflation expectations](https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/CPI_and_Fed_Funds_Rates.ipynb),
 [here for public debt analysis](https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/Fed_Public_Debt_and_Fed_Tax_Revenue.ipynb),
 [here for public debt ownership analysis](https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/Fed_Public_Debt_Holders.ipynb),
 [here for the analysis of M2, Real PCE, Wage Infation, and CPI](https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/M2_PCE_and_CPI.ipynb), and
 [here for the analysis of Participation, Employment to Population, Unemployment, and Unfilled Vacancies to Population Rates](https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/Unemployment_and_Participation_Rates.ipynb).
+[here for the analysis of US Money supply](https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/Money_Supply.ipynb)
 
 You can also run these notebooks in Google cloud. This way you don't need to install anything locally. This takes just a few seconds:
 1. Go to [Google Colaboratory](https://colab.research.google.com/notebooks/intro.ipynb#recent=true) in your browser
