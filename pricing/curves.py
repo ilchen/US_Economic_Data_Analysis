@@ -181,7 +181,7 @@ class YieldCurve:
     def get_curve_points(self, n):
         """
         Returns a Series object corresponding to this yield curve's points evenly spaced,
-        indexed by datatime.date values
+        indexed by datatime.date values represented as a DatetimeIndex.
 
         :param n: the number of points to return, must be >= 2
         """
@@ -190,11 +190,12 @@ class YieldCurve:
         timestamps = [self.timestamps[0] + i * delta for i in range(n)]
         pairs = list(zip(*[(date.fromtimestamp(timestamp), self.ppoly(timestamp).tolist())
                            for timestamp in timestamps]))
-        return pd.Series(pairs[1], index=pairs[0], name=str(self.date))
+        return pd.Series(pairs[1], index=pd.DatetimeIndex(pairs[0]), name=str(self.date))
 
     def get_curve_points_indexed_by_maturities(self, n, maturity_repr=MaturityRepresentation.PANDAS_TIMEDELTA):
         """
-        Returns a Series object corresponding to this yield curve's points evenly spaced, indexed by maturities.
+        Returns a Series object corresponding to this yield curve's points evenly spaced, indexed by maturities
+        represented as a TimedeltaIndex if maturity_repr is PANDAS_TIMEDELTA or Int64Index or Float64Index otherwise.
 
         :param n: the number of points to return, must be >= 2
         :param maturity_repr: an instance of the MaturityRepresentation enum designating the
