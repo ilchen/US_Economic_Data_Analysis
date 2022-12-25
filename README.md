@@ -10,6 +10,7 @@ So far I created the following notebooks:
 * [Analysis of Participation, Employment to Population, Unemployment, and Unfilled Vacancies to Population Rates](./Unemployment_and_Participation_Rates.ipynb)
 * [Analysis of US Money Supply](./Money_Supply.ipynb)
 * [Analysis of US Interest Rate Spreads](./Interest_Rate_Spreads.ipynb) 
+* [Analysis of US Past, Current, and Future Riskfree Rates](./Current_Riskfree_Rates.ipynb)
 
 ## Requirements
 You'll need python3 and pip. `brew install python` will do if you are on MacOS. You can even forgo installing anything and run these notebooks in Google cloud, as I outline below.
@@ -18,6 +19,7 @@ In case you opt for a local installation, the rest of the dependencies can be in
 ```commandline
 python3 -m pip install -r requirements.txt
 ```
+**NB**: I use Yahoo-Finance data in the `Current_Riskfree_Rates.ipynb` notebook. Unfortunately Yahoo recently changed their API, as a result the last official version of pandas-datareader fails when retrieving data from Yahoo-Finance. To overcome this until a new version of pandas-datareader addresses this, please follow [this explanation](https://stackoverflow.com/questions/74832296/typeerror-string-indices-must-be-integers-when-getting-data-of-a-stock-from-y).
 
 ## How to run
 After you clone the repo and `cd` into its directory and run one of the below commands depending on which notebook you are interested in:
@@ -48,6 +50,10 @@ or
 ```commandline
 jupyter notebook Interest_Rate_Spreads.ipynb
 ```
+or
+```commandline
+jupyter notebook Current_Riskfree_Rates.ipynb
+```
 
 A full run of these notebooks can be seen [here for CPI, Fed Funds Rate, Treasury rates and Inflation expectations](https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/CPI_and_Fed_Funds_Rates.ipynb),
 [here for public debt analysis](https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/Fed_Public_Debt_and_Fed_Tax_Revenue.ipynb),
@@ -55,7 +61,8 @@ A full run of these notebooks can be seen [here for CPI, Fed Funds Rate, Treasur
 [here for the analysis of M2, Real PCE, Wage Infation, and CPI](https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/M2_PCE_and_CPI.ipynb),
 [here for the analysis of Participation, Employment to Population, Unemployment, and Unfilled Vacancies to Population Rates](https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/Unemployment_and_Participation_Rates.ipynb),
 [here for the analysis of US Money supply](https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/Money_Supply.ipynb), and
-[here for the analysis of US Interest Rate Spreads](https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/Interest_Rate_Spreads.ipynb).
+[here for the analysis of US Interest Rate Spreads](https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/Interest_Rate_Spreads.ipynb), and
+[here for the analysis of US Past, Current, and Future Riskfree rates](https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/Current_Riskfree_Rates.ipynb).
 
 You can also run these notebooks in Google cloud. This way you don't need to install anything locally. This takes just a few seconds:
 1. Go to [Google Colaboratory](https://colab.research.google.com/notebooks/intro.ipynb#recent=true) in your browser
@@ -67,5 +74,6 @@ or `https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/M2_PCE_and_CPI
 or `https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/Unemployment_and_Participation_Rates.ipynb`
 or `https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/Money_Supply.ipynb`
 or `https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/Interest_Rate_Spreads.ipynb`
+or `https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/Current_Riskfree_Rates.ipynb`
 5. Click the search icon
 6. Enjoy
