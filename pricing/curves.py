@@ -110,9 +110,22 @@ class YieldCurve:
         Returns the discount factor for maturity corresponding to 'dt' relative to the forward date 'forward_datetime'
         :param forward_datetime: a datetime.datetime object relative to which the discount factor
                                  for maturity 'dt' needs to be calculated
-        :param dt: a datetime.date or datetime.datetime object for which the yield needs to be calculated
-        :returns: a discount factor such that any cashflow on date 'date' should be multiplied
+        :param dt: a datetime.date or datetime.datetime object for which the discount factor needs to be calculated
+        :returns: a discount factor such that any cashflow on date 'dt' should be multiplied
                   by value returned to obtain its NPV
+        """
+        yfw, term_in_years = self.get_forward_yield_for_maturity_date(forward_datetime, dt)
+        return exp(-self.to_continuous_compounding(yfw) * term_in_years)
+
+    def get_forward_yield_for_maturity_date(self, forward_datetime, dt):
+        """
+        Returns forward yield for maturity corresponding to 'dt' relative to the forward date 'forward_datetime'
+        :param forward_datetime: a datetime.datetime object relative to which the discount factor
+                                 for maturity 'dt' needs to be calculated
+        :param dt: a datetime.date or datetime.datetime object for which the yield needs to be calculated
+        :returns: a tuple whose first element is the forward yield (expressed with a compounding frequency
+                  specified during the construction of this YieldCurve object) and the second the difference
+                  between 'dt' and 'forward_datetime expressed in years
         """
         adjusted_datetime = datetime.combine(dt, time()) if type(dt) is date else dt
         timestamp = adjusted_datetime.timestamp()
@@ -124,10 +137,10 @@ class YieldCurve:
         ytf = self.ppoly(forward_timestamp).tolist()
         num_years_to_maturity = YieldCurve.year_difference(self.date, adjusted_datetime)
         num_years_to_forward = YieldCurve.year_difference(self.date, forward_datetime)
-        yfw = (ytm * num_years_to_maturity - ytf * num_years_to_forward)\
-              / (num_years_to_maturity - num_years_to_forward)
-        yfw = self.to_continuous_compounding(yfw)
-        return exp(-yfw * (num_years_to_maturity - num_years_to_forward))
+        # Recalculating is more accurate than 'term = num_years_to_maturity - num_years_to_forward'
+        term = YieldCurve.year_difference(forward_datetime, adjusted_datetime)
+        yfw = (ytm * num_years_to_maturity - ytf * num_years_to_forward) / term
+        return yfw, term
 
     def to_continuous_compounding(self, rate):
         return rate if self.comp_freq == 0 else self.comp_freq * log(1 + rate / self.comp_freq)
@@ -137,20 +150,10 @@ class YieldCurve:
         Converts 'dt' to a maturity expressed in years relative to the starting date of this curve
         :param dt: a datetime.date object that needs to be converted into maturity in years
         """
-
         adjusted_datetime = datetime.combine(dt, time()) + (BDay(0) if self.align_on_bd else timedelta())
         timestamp = adjusted_datetime.timestamp()
         assert self.timestamps[0] <= timestamp <= self.timestamps[-1]
-
-        # An alternative less accurate but simpler way of calculating the same
-        # return (pd.to_datetime(adjusted_datetime) - pd.to_datetime(self.date)) / np.timedelta64(1, 'Y')
-
-        num_days = (adjusted_datetime.date() - self.date).days
-        num_leap_years = YieldCurve.get_num_leap_years(self.date.year, adjusted_datetime.date().year)
-        leap_years_add_on = num_leap_years / (adjusted_datetime.date().year - self.date.year) \
-            if num_leap_years else 0
-        num_years = num_days / (365. + leap_years_add_on)
-        return num_years
+        return YieldCurve.year_difference(self.date, adjusted_datetime)
 
     def to_timedelta(self, delta_in_years):
         """
@@ -238,16 +241,32 @@ class YieldCurve:
 
     @staticmethod
     def get_num_leap_years(year_start, year_end):
+        """
+        Returns the number of leap years in the range [year_start; year_end)
+        """
         return reduce(lambda accu, year: accu + YieldCurve.is_leap_year(year),
                       range(year_start, year_end), 0)
 
     @staticmethod
     def year_difference(date1, date2):
+        """
+        Calculates the difference between 'date2' and 'date1' in years teaking leap years into account
+
+        :param date1: a datetime.date or datetime.datetime instance
+        :param date2: a datetime.date or datetime.datetime instance
+        :return: a positive float value if date2 >= date1, a negative value otherwise
+        """
         assert isinstance(date1, (date, datetime)) and isinstance(date2, (date, datetime))
         # Normalize to datetime
         date1 = date1 if isinstance(date1, datetime) else datetime.combine(date1, time())
         date2 = date2 if isinstance(date2, datetime) else datetime.combine(date2, time())
         time_delta = date2 - date1
-        num_leap_years = YieldCurve.get_num_leap_years(date1.year, date2.year)
+        num_leap_years = YieldCurve.get_num_leap_years(date1.year, date2.year+1)
+        if date1 > datetime(date1.year, 2, 28) and YieldCurve.is_leap_year(date1.year):
+            num_leap_years -= 1
+        if date2 <= datetime(date2.year, 2, 28) and YieldCurve.is_leap_year(date2.year):
+            num_leap_years -= 1
         leap_years_add_on = 0 if num_leap_years == 0 else num_leap_years / (date2.year - date1.year)
+        # Less accurate
+        # return (pd.to_datetime(date2) - pd.to_datetime(date1)) / np.timedelta64(1, 'Y')
         return (time_delta.days + time_delta.seconds / (24. * 60 * 60)) / (365. + leap_years_add_on)

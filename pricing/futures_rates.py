@@ -32,28 +32,30 @@ class CMEFixedIncomeFuturesRates:
 
     def get_next_n_months_tickers(self, n, ticker_prefix='ZQ', ticker_suffix='.CBT'):
         """
-        Returns CME ticker symbols for the next n months.
-        :param n: and integer indicating how many future months to return ticker symbols
+        Returns CME ticker symbols for the next n months
+
+        :param n: an integer indicating how many future months to return ticker symbols for
         :param ticker_prefix: a string designating a CME's ticker symbol prefix
-        :param ticket_suffix: a string designating a suffix for the ticker symbols returne
+        :param ticker_suffix: a string designating a suffix for the ticker symbols returne
         :returns: a list of tuples where the first tuple component is the ticket symbol represented as a string
                   and the second is a date.date object rounded down to the start of the month
         """
-        months = [self.cur_date + relativedelta(months=+i) for i in range(1, n+1)]
-        return [(ticker_prefix+self.MONTHS[m.month-1]+str(m.year)[-2:]+ticker_suffix, date(m.year, m.month, 1))
+        months = [self.cur_date + relativedelta(months=+i) for i in range(1, n + 1)]
+        return [(ticker_prefix + self.MONTHS[m.month - 1] + str(m.year)[-2:] + ticker_suffix, date(m.year, m.month, 1))
                 for m in months]
 
     def get_next_n_quarter_tickers(self, n, ticker_prefix='ZN', ticker_suffix='.CBT'):
         """
         Returns CME ticker symbols for the next n quarters.
+
         :param n: and integer indicating how many future quarters to return ticker symbols
         :param ticker_prefix: a string designating a CME's ticker symbol prefix
-        :param ticket_suffix: a string designating a suffix for the ticker symbols returne
+        :param ticker_suffix: a string designating a suffix for the ticker symbols returne
         :returns: a list of tuples where the first tuple component is the ticket symbol represented as a string
                   and the second is a date.date object rounded down to the start of the month
         """
-        months = [self.cur_date + i * QuarterBegin(startingMonth=3) for i in range(1, n+1)]
-        return [(ticker_prefix+self.MONTHS[m.month-1]+str(m.year)[-2:]+ticker_suffix, date(m.year, m.month, 1))
+        months = [self.cur_date + i * QuarterBegin(startingMonth=3) for i in range(1, n + 1)]
+        return [(ticker_prefix + self.MONTHS[m.month - 1] + str(m.year)[-2:] + ticker_suffix, date(m.year, m.month, 1))
                 for m in months]
 
     @staticmethod
@@ -82,12 +84,14 @@ class CMEFixedIncomeFuturesRates:
         return 2. * (np.exp(series / 2.) - 1.)
 
     @staticmethod
-    def tnote_price_to_yield(tnote_price, maturity=10):
+    def tnote_price_to_yield(tnote_price, maturity=7):
         """
-        Converts an n-year T-Note/Bond futures price to a corresponding yield
+        Converts an n-year T-Note/Bond futures price to a corresponding yield with semiannual compounding.
+        The 10-year T-Note contract allows for delivery of any T-Note with fixed semi-annual coupons and
+        a remaining time to maturity of no less than 6.5 years and no more than 7.75 years.
 
         :param tnote_price: a float64 value representing the T-Note/Bond price
-        :param maturity: an integer value representing the maturity of the T-Note/Bond
+        :param maturity: an integer value representing the maturity of the T-Note/Bond that is expected to be delivered
         """
 
         # CME T-Note/Bond futures contracts are priced assuming a 6% par yield and 6% yield to maturity
@@ -119,8 +123,8 @@ class CMEFedFundsFuturesRates(CMEFixedIncomeFuturesRates):
         the average future Fed Funds rate for a given future month
         """
         tickers, months = list(zip(*self.get_next_n_months_tickers(n)))
-        series = web.get_data_yahoo(tickers, self.cur_date-BDay(3), self.cur_date)\
-                .loc[:,'Adj Close'].iloc[-1]
+        series = web.get_data_yahoo(tickers, self.cur_date - BDay(3), self.cur_date)\
+                    .loc[:, 'Adj Close'].iloc[-1]
         return ((100. - series) / 100.).set_axis(pd.DatetimeIndex(months))
 
 
@@ -129,6 +133,7 @@ class CME10YearTNoteFuturesYields(CMEFixedIncomeFuturesRates):
     This class infers future 10-Year T-Note yields traded on CME. Rates returned use the Actual/Actual day count
     convention and semi-annual compounding.
     """
+
     def __init__(self, cur_date):
         super().__init__(cur_date)
 
@@ -138,8 +143,8 @@ class CME10YearTNoteFuturesYields(CMEFixedIncomeFuturesRates):
         the average future Fed Funds rate for a given future month
         """
         tickers, months = list(zip(*self.get_next_n_quarter_tickers(n)))
-        series = web.get_data_yahoo(tickers, self.cur_date-BDay(3), self.cur_date)\
-                .loc[:,'Adj Close'].iloc[-1]
+        series = web.get_data_yahoo(tickers, self.cur_date - BDay(3), self.cur_date) \
+                    .loc[:, 'Adj Close'].iloc[-1]
         series = series.set_axis(pd.DatetimeIndex(months)).dropna()
         series2 = series.apply(self.tnote_price_to_yield)
         return self.from_continuous_compound_to_semiannual(series2)
@@ -190,6 +195,10 @@ class CashflowDescriptor:
     def pv_all_cashflows(self, discount_rate, t0=0):
         return self.pv_cashflows(self.timeline, discount_rate, t0)
 
+    # Special method needed to value the floating leg of asset swaps
+    def pv_all_cashflows_with_other_coupon_rate(self, other_coupon_rate, discount_rate, t0=0):
+        return sum(map(lambda t: self.cashflow(t, other_coupon_rate) * exp(-discount_rate * (t - t0)), self.timeline))
+
 
 if __name__ == "__main__":
     import sys
@@ -199,7 +208,6 @@ if __name__ == "__main__":
     from dateutil.relativedelta import relativedelta
     import pandas_datareader.data as web
     import numpy as np
-
 
     try:
         locale.setlocale(locale.LC_ALL, '')
