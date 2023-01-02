@@ -117,34 +117,41 @@ class CMEFedFundsFuturesRates(CMEFixedIncomeFuturesRates):
     def __init__(self, cur_date):
         super().__init__(cur_date)
 
-    def get_rates_for_next_n_months(self, n):
+    def get_rates_for_next_n_months(self, n, dt=None):
         """
         Returns a pandas.Series object indexed by pandas.DatetimeIndex whose values represent
         the average future Fed Funds rate for a given future month
+
+        :param n: for how many months (starting from the next month from the date this instance was initialized with)
+                  to return the average future Fed Funds rates
+        :param dt: datetime.date or pandas.Timestamp object specifying a past business day to use for retrieving
+                   the prices of Fed Funds Futures contracts, if set to None the current date this instance was
+                   initialized with will be used.
         """
         tickers, months = list(zip(*self.get_next_n_months_tickers(n)))
-        series = web.get_data_yahoo(tickers, self.cur_date - BDay(3), self.cur_date)\
-                    .loc[:, 'Adj Close'].iloc[-1]
+        dt = dt.date() if isinstance(dt, (datetime, pd.Timestamp)) else dt if isinstance(dt, date) else self.cur_date
+        series = web.get_data_yahoo(tickers, dt - BDay(3), dt).loc[:, 'Adj Close'].iloc[-1]
         return ((100. - series) / 100.).set_axis(pd.DatetimeIndex(months))
 
 
 class CME10YearTNoteFuturesYields(CMEFixedIncomeFuturesRates):
     """
     This class infers future 10-Year T-Note yields traded on CME. Rates returned use the Actual/Actual day count
-    convention and semi-annual compounding.
+    convention and a semi-annual compounding frequency. The yields returned are an approximation of correct future
+    10-Year T-Note yields given that CME allows delivery of T-Notes with maturity of 6.5 years and more.
     """
 
     def __init__(self, cur_date):
         super().__init__(cur_date)
 
-    def get_yields_for_next_n_quarters(self, n):
+    def get_yields_for_next_n_quarters(self, n, dt=None):
         """
         Returns a pandas.Series object indexed by pandas.DatetimeIndex whose values represent
         the average future Fed Funds rate for a given future month
         """
         tickers, months = list(zip(*self.get_next_n_quarter_tickers(n)))
-        series = web.get_data_yahoo(tickers, self.cur_date - BDay(3), self.cur_date) \
-                    .loc[:, 'Adj Close'].iloc[-1]
+        dt = dt.date() if isinstance(dt, (datetime, pd.Timestamp)) else dt if isinstance(dt, date) else self.cur_date
+        series = web.get_data_yahoo(tickers, dt - BDay(3), dt).loc[:, 'Adj Close'].iloc[-1]
         series = series.set_axis(pd.DatetimeIndex(months)).dropna()
         series2 = series.apply(self.tnote_price_to_yield)
         return self.from_continuous_compound_to_semiannual(series2)
@@ -195,32 +202,3 @@ class CashflowDescriptor:
     def pv_all_cashflows(self, discount_rate, t0=0):
         return self.pv_cashflows(self.timeline, discount_rate, t0)
 
-    # Special method needed to value the floating leg of asset swaps
-    def pv_all_cashflows_with_other_coupon_rate(self, other_coupon_rate, discount_rate, t0=0):
-        return sum(map(lambda t: self.cashflow(t, other_coupon_rate) * exp(-discount_rate * (t - t0)), self.timeline))
-
-
-if __name__ == "__main__":
-    import sys
-    import locale
-    from datetime import date, datetime
-
-    from dateutil.relativedelta import relativedelta
-    import pandas_datareader.data as web
-    import numpy as np
-
-    try:
-        locale.setlocale(locale.LC_ALL, '')
-        start = date.today()
-        inferrer = CMEFedFundsFuturesRates(start)
-        inferrer2 = CME10YearTNoteFuturesYields(start)
-        tickers, _ = list(zip(*inferrer.get_next_n_months_tickers(15)))
-        print(tickers)
-        tickers, months = list(zip(*inferrer.get_next_n_quarter_tickers(4)))
-        print(tickers)
-        print(months)
-        rates = inferrer.get_rates_for_next_n_months(15)
-        print(rates)
-        yields = inferrer2.get_yields_for_next_n_quarters(4)
-    except:
-        print("Unexpected error: ", sys.exc_info())
