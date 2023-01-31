@@ -131,7 +131,7 @@ class CMEFedFundsFuturesRates(CMEFixedIncomeFuturesRates):
         tickers, months = list(zip(*self.get_next_n_months_tickers(n)))
         dt = dt.date() if isinstance(dt, (datetime, pd.Timestamp)) else dt if isinstance(dt, date) else self.cur_date
         series = web.get_data_yahoo(tickers, dt - BDay(3), dt).loc[:, 'Adj Close'].iloc[-1]
-        return ((100. - series) / 100.).set_axis(pd.DatetimeIndex(months))
+        return ((100. - series.reindex(tickers)) / 100.).set_axis(pd.DatetimeIndex(months))
 
 
 class CME10YearTNoteFuturesYields(CMEFixedIncomeFuturesRates):
@@ -152,7 +152,7 @@ class CME10YearTNoteFuturesYields(CMEFixedIncomeFuturesRates):
         tickers, months = list(zip(*self.get_next_n_quarter_tickers(n)))
         dt = dt.date() if isinstance(dt, (datetime, pd.Timestamp)) else dt if isinstance(dt, date) else self.cur_date
         series = web.get_data_yahoo(tickers, dt - BDay(3), dt).loc[:, 'Adj Close'].iloc[-1]
-        series = series.set_axis(pd.DatetimeIndex(months)).dropna()
+        series = series.reindex(tickers).set_axis(pd.DatetimeIndex(months)).dropna()
         series2 = series.apply(self.tnote_price_to_yield)
         return self.from_continuous_compound_to_semiannual(series2)
 
@@ -201,4 +201,8 @@ class CashflowDescriptor:
 
     def pv_all_cashflows(self, discount_rate, t0=0):
         return self.pv_cashflows(self.timeline, discount_rate, t0)
+
+    # Special method needed to value the floating leg of asset swaps
+    def pv_all_cashflows_with_other_coupon_rate(self, other_coupon_rate, discount_rate, t0=0):
+        return sum(map(lambda t: self.cashflow(t, other_coupon_rate) * exp(-discount_rate * (t - t0)), self.timeline))
 
