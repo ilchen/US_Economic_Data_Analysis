@@ -261,12 +261,16 @@ class YieldCurve:
         date1 = date1 if isinstance(date1, datetime) else datetime.combine(date1, time())
         date2 = date2 if isinstance(date2, datetime) else datetime.combine(date2, time())
         time_delta = date2 - date1
-        num_leap_years = YieldCurve.get_num_leap_years(date1.year, date2.year+1)
-        if date1 > datetime(date1.year, 2, 28) and YieldCurve.is_leap_year(date1.year):
-            num_leap_years -= 1
-        if date2 <= datetime(date2.year, 2, 28) and YieldCurve.is_leap_year(date2.year):
-            num_leap_years -= 1
-        leap_years_add_on = 0 if num_leap_years == 0 else num_leap_years / (date2.year - date1.year)
+
+        if date2.year == date1.year:
+            leap_years_add_on = 1 if YieldCurve.is_leap_year(date1.year) else 0
+        else:
+            num_leap_years = YieldCurve.get_num_leap_years(date1.year, date2.year+1)
+            if date1 > datetime(date1.year, 2, 28) and YieldCurve.is_leap_year(date1.year):
+                num_leap_years -= 1
+            if date2 <= datetime(date2.year, 2, 28) and YieldCurve.is_leap_year(date2.year):
+                num_leap_years -= 1
+            leap_years_add_on = 0 if num_leap_years == 0 else num_leap_years / (date2.year - date1.year)
         # Less accurate
         # return (pd.to_datetime(date2) - pd.to_datetime(date1)) / np.timedelta64(1, 'Y')
         return (time_delta.days + time_delta.seconds / (24. * 60 * 60)) / (365. + leap_years_add_on)
