@@ -10,3 +10,4 @@ pandas-datareader>=0.10.0
 jupyter>=1.0.0
 Jinja2>=3.1.2
 yfinance>=0.2.9
+eurostat>=1.0.1
