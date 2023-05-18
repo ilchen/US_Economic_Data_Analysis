@@ -12,6 +12,7 @@ So far I created the following notebooks:
 * [Analysis of Quantitative Easing and Tapering by the Federal Reserve](./Quantitative_Easing_and_Tapering.ipynb)
 * [Analysis of US Interest Rate Spreads](./Interest_Rate_Spreads.ipynb) 
 * [Analysis of US Past, Current, and Future Riskfree Rates](./Current_Riskfree_Rates.ipynb)
+* [Analysis of US Industrial Production](./Industrial_Production.ipynb)
 
 ## Requirements
 You'll need python3 and pip. `brew install python` will do if you are on MacOS. You can even forgo installing anything and run these notebooks in Google cloud, as I outline below.
@@ -58,6 +59,10 @@ jupyter notebook Interest_Rate_Spreads.ipynb
 or
 ```commandline
 jupyter notebook Current_Riskfree_Rates.ipynb
+```
+or
+```commandline
+jupyter notebook Industrial_Production.ipynb
 ```
 
 A full run of these notebooks can be seen [here for CPI, Fed Funds Rate, Treasury rates and Inflation expectations](https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/CPI_and_Fed_Funds_Rates.ipynb),
