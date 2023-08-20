@@ -13,6 +13,8 @@ So far I created the following notebooks:
 * [Analysis of US Interest Rate Spreads](./Interest_Rate_Spreads.ipynb) 
 * [Analysis of US Past, Current, and Future Riskfree Rates](./Current_Riskfree_Rates.ipynb)
 * [Analysis of US Industrial Production](./Industrial_Production.ipynb)
+* [Analysis of US GDP, its composition by industry, and trends in its make-up](./GDP_Composition.ipynb) 
+* [Analysis of US Labor productivity (incl. comparison with that in EU)](./Labor_Productivity.ipynb)
 
 ## Requirements
 You'll need python3 and pip. `brew install python` will do if you are on MacOS. You can even forgo installing anything and run these notebooks in Google cloud, as I outline below.
@@ -63,6 +65,14 @@ jupyter notebook Current_Riskfree_Rates.ipynb
 or
 ```commandline
 jupyter notebook Industrial_Production.ipynb
+```
+or
+```commandline
+jupyter notebook GDP_Composition.ipynb
+```
+or
+```commandline
+jupyter notebook Labor_Productivity.ipynb
 ```
 
 A full run of these notebooks can be seen [here for CPI, Fed Funds Rate, Treasury rates and Inflation expectations](https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/CPI_and_Fed_Funds_Rates.ipynb),
