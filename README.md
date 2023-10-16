@@ -8,7 +8,7 @@ So far I created the following notebooks:
 * [Analysis of the evolution of the ownership structure of US Federal Debt](./Fed_Public_Debt_Holders.ipynb)
 * [Analysis of changes in M2, Real Personal Consumption Expenditures (PCE), Wage Inflation and CPI](./M2_PCE_and_CPI.ipynb)
 * [Analysis of Participation, Employment to Population, Unemployment, and Unfilled Vacancies to Population Rates](./Unemployment_and_Participation_Rates.ipynb)
-* [Analysis of US Money Supply](./Money_Supply.ipynb), plus [a similar analysis for the Eurozone by way of comparison](./Money_Supply_Eurozone.ipynb.ipynb)
+* [Analysis of US Money Supply](./Money_Supply.ipynb), plus [a similar analysis for the Eurozone by way of comparison](./Money_Supply_Eurozone.ipynb))
 * [Analysis of Quantitative Easing and Tapering by the Federal Reserve](./Quantitative_Easing_and_Tapering.ipynb)
 * [Analysis of US Interest Rate Spreads](./Interest_Rate_Spreads.ipynb) 
 * [Analysis of US Past, Current, and Future Riskfree Rates](./Current_Riskfree_Rates.ipynb)
