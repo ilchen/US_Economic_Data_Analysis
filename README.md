@@ -1,15 +1,15 @@
 # US Economic Data Analysis
-This repository contains Jupyter notebooks that visually analyze US Economic data as provided by [St. Louis Fed](https://fred.stlouisfed.org) and the [OECD](https://stats.oecd.org). The analysis is carried out using [Pandas](https://pandas.pydata.org), [Pandas datareader](https://pydata.github.io/pandas-datareader/), and [Matplotlib](https://matplotlib.org/stable/index.html).
+This repository contains Jupyter notebooks that visually analyze US Economic data as provided by [St. Louis Fed](https://fred.stlouisfed.org), the [OECD](https://stats.oecd.org), and [Yahoo-Finance](https://finance.yahoo.com/). The analysis is carried out using [Pandas](https://pandas.pydata.org), [Pandas datareader](https://pydata.github.io/pandas-datareader/), and [Matplotlib](https://matplotlib.org/stable/index.html).
 
-So far I created the following notebooks:
-* [Analysis of the evolution of the seasonally adjusted CPI, Fed Funds Effective Rate, Market Yield on U.S. Treasury Securities at 10-Year Constant Maturity, and comparison of the present US Treasury Yield Curve with Annual Inflation Expectations](./CPI_and_Fed_Funds_Rates.ipynb), plus [a similar analysis for the Eurozone by way of comparison](./CPI_and_ECB_Rates.ipynb)
-* [Analysis of the evolution of the US Federal Public Debt as percentage of GDP, Public Debt as percentage of Federal annual tax revenue, Annual pulic deficit as percentage of GDP, and interest outlays to tax revenues](./Fed_Public_Debt_and_Fed_Tax_Revenue.ipynb)
+So far I created the following notebooks (following a given link lets you see the most recent run of its notebook, I aim to refresh results monthly):
+* [Analysis of CPI, Fed Funds Rate, Treasury rates and Inflation expectations](./CPI_and_Fed_Funds_Rates.ipynb), plus [a similar analysis for the Eurozone by way of comparison](./CPI_and_ECB_Rates.ipynb)
+* [Analysis of the evolution of the US Federal Public Debt](./Fed_Public_Debt_and_Fed_Tax_Revenue.ipynb)
 * [Analysis of the evolution of the ownership structure of US Federal Debt](./Fed_Public_Debt_Holders.ipynb)
 * [Analysis of changes in M2, Real Personal Consumption Expenditures (PCE), Wage Inflation and CPI](./M2_PCE_and_CPI.ipynb)
-* [Analysis of Participation, Employment to Population, Unemployment, and Unfilled Vacancies to Population Rates](./Unemployment_and_Participation_Rates.ipynb)
+* [Analysis of Participation, Employment, Unemployment, Job-vacancy, and Unfilled Vacancies to Population Rates](./Unemployment_and_Participation_Rates.ipynb)
 * [Analysis of US Money Supply](./Money_Supply.ipynb), plus [a similar analysis for the Eurozone by way of comparison](./Money_Supply_Eurozone.ipynb)
 * [Analysis of Quantitative Easing and Tapering by the Federal Reserve](./Quantitative_Easing_and_Tapering.ipynb)
-* [Analysis of US Interest Rate Spreads](./Interest_Rate_Spreads.ipynb) 
+* [Analysis of US Treasury Yields' Spreads](./Interest_Rate_Spreads.ipynb) 
 * [Analysis of US Past, Current, and Future Riskfree Rates](./Current_Riskfree_Rates.ipynb), plus [a similar analysis for the Eurozone](./Current_Riskfree_Rates_Eurozone.ipynb)
 * [Analysis of US Industrial Production](./Industrial_Production.ipynb)
 * [Analysis of US GDP, its composition by industry, and trends in its make-up](./GDP_Composition.ipynb) 
@@ -27,8 +27,8 @@ python3 -m pip install -r requirements.txt
 ## How to run locally
 If you want to run the notebooks locally on your laptop, clone the repo and `cd` into its directory, e.g.:
 ```commandline
-git clone -l -s https://github.com/ilchen/US_Economic_Data_Analysis.git cloned-repo
-cd cloned-repo
+git clone -l -s https://github.com/ilchen/US_Economic_Data_Analysis.git
+cd US_Economic_Data_Analysis
 ```
 run one of the below commands depending on which notebook you are interested in:
 ```commandline
@@ -78,20 +78,6 @@ or
 ```commandline
 jupyter notebook Labor_Productivity.ipynb
 ```
-
-A full run of these notebooks can be seen [here for CPI, Fed Funds Rate, Treasury rates and Inflation expectations](https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/CPI_and_Fed_Funds_Rates.ipynb),
-[here for public debt analysis](https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/Fed_Public_Debt_and_Fed_Tax_Revenue.ipynb),
-[here for public debt ownership analysis](https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/Fed_Public_Debt_Holders.ipynb),
-[here for the analysis of M2, Real PCE, Wage Infation, and CPI](https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/M2_PCE_and_CPI.ipynb),
-[here for the analysis of Participation, Employment to Population, Unemployment, and Unfilled Vacancies to Population Rates](https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/Unemployment_and_Participation_Rates.ipynb),
-[here for the analysis of US Money supply](https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/Money_Supply.ipynb),
-[here for the analysis of US Interest Rate Spreads](https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/Interest_Rate_Spreads.ipynb),
-[here for the analysis of US Past, Current, and Future Riskfree rates](https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/Current_Riskfree_Rates.ipynb),
-[here for the analysis of the quantitative easing and tapering by the Fed](https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/Quantitative_Easing_and_Tapering.ipynb),
-[here for the analysis of trends in US Industrial production and its current state](https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/Industrial_Production.ipynb),
-[here for the analysis of trends in US GDP composition and its current state](https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/GDP_Composition.ipynb), and
-[here for the analysis of trends in US labor productivity and its comparison to that in the EU](https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/Labor_Productivity.ipynb).
-
 
 ## How to run in Google cloud
 You can also run these notebooks in Google cloud. This way you don't need to install anything locally. This takes just a few seconds:
