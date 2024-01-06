@@ -2,7 +2,7 @@
 This repository contains Jupyter notebooks that visually analyze US Economic data as provided by [St. Louis Fed](https://fred.stlouisfed.org), the [OECD](https://stats.oecd.org), and [Yahoo-Finance](https://finance.yahoo.com/). The analysis is carried out using [Pandas](https://pandas.pydata.org), [Pandas datareader](https://pydata.github.io/pandas-datareader/), and [Matplotlib](https://matplotlib.org/stable/index.html).
 
 So far I created the following notebooks (following a given link lets you see the most recent run of its notebook, I aim to refresh results monthly):
-* [Analysis of CPI, Fed Funds Rate, Treasury rates and Inflation expectations](./CPI_and_Fed_Funds_Rates.ipynb), plus [a similar analysis for the Eurozone by way of comparison](./CPI_and_ECB_Rates.ipynb)
+* [Analysis of CPI, Fed Funds Rate, Treasury rates and Inflation expectations](./CPI_and_Fed_Funds_Rates.ipynb), plus [a similar analysis for the Eurozone by way of comparison](./HICP_and_ECB_Rates.ipynb)
 * [Analysis of the evolution of the US Federal Public Debt](./Fed_Public_Debt_and_Fed_Tax_Revenue.ipynb)
 * [Analysis of the evolution of the ownership structure of US Federal Debt](./Fed_Public_Debt_Holders.ipynb)
 * [Analysis of changes in M2, Real Personal Consumption Expenditures (PCE), Wage Inflation and CPI](./M2_PCE_and_CPI.ipynb)
