@@ -14,7 +14,7 @@ So far I created the following notebooks (following a given link lets you see th
 * [Analysis of US Industrial Production](./Industrial_Production.ipynb)
 * [Analysis of US GDP, its composition by industry, and trends in its make-up](./GDP_Composition.ipynb) 
 * [Analysis of US Labor productivity (incl. comparison with that in EU)](./Labor_Productivity.ipynb)
-* [Analysis of disposable income and savings rates of US individuals](./Disposable_Income_and_Savings.ipynb)
+* [Analysis of disposable income and savings rates of US individuals](./Disposable_Income_and_Savings.ipynb), plus [a similar analysis for the Eurozone](./Disposable_Income_and_Savings_Eurozone.ipynb)
 
 ## Requirements
 You'll need python3 and pip. `brew install python` will do if you are on MacOS. You can even forgo installing anything and run these notebooks in Google cloud, as I outline below.
