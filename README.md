@@ -12,7 +12,7 @@ So far I created the following notebooks (following a given link lets you see th
 * [Analysis of US Treasury Yields' Spreads](./Interest_Rate_Spreads.ipynb) 
 * [Analysis of US Past, Current, and Future Riskfree Rates](./Current_Riskfree_Rates.ipynb), plus [a similar analysis for the Eurozone](./Current_Riskfree_Rates_Eurozone.ipynb)
 * [Analysis of US Industrial Production](./Industrial_Production.ipynb)
-* [Analysis of US GDP, its composition by industry, and trends in its make-up](./GDP_Composition.ipynb) 
+* [Analysis of US GDP, its composition by industry, and trends in its make-up](./GDP_Composition.ipynb), plus [a similar analysis for the Eurozone](./GDP_Composition_Eurozone.ipynb)
 * [Analysis of US Labor productivity (incl. comparison with that in EU)](./Labor_Productivity.ipynb)
 * [Analysis of disposable income and savings rates of US individuals](./Disposable_Income_and_Savings.ipynb), plus [a similar analysis for the Eurozone](./Disposable_Income_and_Savings_Eurozone.ipynb)
 
