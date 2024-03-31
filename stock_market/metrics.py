@@ -57,20 +57,24 @@ class Metrics:
 
         # Unfortunately Yahoo-Finance provides dividend yield only for the most recent trading day
         self.dividend_yield = {}
+        self.pe = {}
         for ticker in self.get_current_components():
-            dividend_yield = self.tickers.tickers[ticker].info.get('dividendYield')
+            info = self.tickers.tickers[ticker].info
+            dividend_yield = info.get('dividendYield')
+            pe = info.get('forwardPE')
             self.dividend_yield[ticker] = 0. if dividend_yield is None else dividend_yield
+            self.pe[ticker] = 0. if pe is None else pe
 
         subset = self.data.loc[:, (self.CLOSE,)]
         delisted_tickers = subset.columns[subset.isna().all()]
         for delisted_ticker in delisted_tickers:
-            if os.path.isfile(os.path.expanduser(f'./stock_market/historical_equity_data/{delisted_ticker}.cvs')):
-                f = pd.read_csv(f'./stock_market/historical_equity_data/{delisted_ticker}.cvs', index_col=0)
+            if os.path.isfile(os.path.expanduser(f'~/historical_equity_data/{delisted_ticker}.cvs')):
+                f = pd.read_csv(f'~/historical_equity_data/{delisted_ticker}.cvs', index_col=0)
             else:
                 # Filling in the gaps with Alpha Vantage API for close prices and volumes of delisted shares
                 # Please request your own API Key in order to make the below call work
                 f = web.DataReader(delisted_ticker, 'av-daily', start=start, api_key=os.getenv('ALPHAVANTAGE_API_KEY'))
-                f.to_csv(f'./stock_market/historical_equity_data/{delisted_ticker}.cvs')
+                f.to_csv(f'~/historical_equity_data/{delisted_ticker}.cvs')
 
             f = f.set_axis(pd.DatetimeIndex(f.index, self.data.index.freq))
             f = f.loc[self.data.index[0]:, ['close', 'volume']]
@@ -130,8 +134,10 @@ class Metrics:
         self.capitalization = pd.DataFrame(0., index=self.data.index,
                                            columns=[Metrics.CAPITALIZATION, Metrics.TURNOVER])
         self.forward_dividend_yield = 0.
+        self.forward_PE = 0.
         for ticker in self.ticker_symbols.keys():
             # print('Processing {:s}'.format(ticker))
+            # df's first column is the closing price and the second is the volume
             df = self.data.loc(axis=1)[:, ticker].droplevel(1, axis=1)
 
             (st, ed) = self.ticker_symbols[ticker]
@@ -145,12 +151,15 @@ class Metrics:
             self.capitalization.loc[st:ed, ticker]\
                 = df.loc[st:ed,Metrics.CLOSE] * self.shares_outstanding[ticker].loc[st:ed]
 
-            # Most recent forward dividend yield
+            # Most recent forward dividend yield and forward P/E
             if ticker in self.get_current_components():
                 self.forward_dividend_yield += (df.iloc[:,0] * self.shares_outstanding[ticker]).iloc[-1]\
                     * self.dividend_yield[ticker]
+                self.forward_PE += (df.iloc[:,0] * self.shares_outstanding[ticker]).iloc[-1] \
+                    * self.pe[ticker]
 
         self.forward_dividend_yield /= self.capitalization.iloc[-1,0]
+        self.forward_PE /= self.capitalization.iloc[-1,0]
 
         # Given that a stock index is used for calculating the volatility, we need to use adjusted close prices.
         if stock_index is not None:
@@ -413,24 +422,26 @@ class USStockMarketMetrics(Metrics):
         last_bd = BDay(0).rollback
         return {'AGN': pd.Series([329002015, 329805791],
                                  index=pd.DatetimeIndex(['2020-02-12', '2020-05-01']).map(last_bd)),
-                'ALXN': pd.Series([218845432, 219847960, 221019230],
-                                  index=pd.DatetimeIndex(['2020-10-27', '2021-02-12', '2021-04-21']).map(last_bd)),
-                'ARNC': pd.Series([109021376, 109052877],
-                                  index=pd.DatetimeIndex(['2020-03-19', '2020-05-15']).map(last_bd)),
-                'ATVI': pd.Series([772857185, 777016759, 782306592, 782625319, 784274126, 786158727, 786798320],
-                                  index=pd.DatetimeIndex(['2020-10-22', '2021-04-27', '2022-07-25', '2022-10-31',
-                                                          '2023-02-16', '2023-04-28', '2023-07-24']).map(last_bd)),
-                'CERN': pd.Series([306589898, 301317068, 294222760, 294098094],
-                                  index=pd.DatetimeIndex(['2020-10-21', '2021-04-30', '2021-10-25',
-                                                          '2022-04-26']).map(last_bd)),
-                'CTXS': pd.Series([123123572, 124167045, 124230000, 124722872, 126579926, 126885081],
-                                  index=pd.DatetimeIndex(['2020-10-23', '2021-04-29', '2021-06-30', '2021-11-01',
-                                                          '2022-04-27', '2022-07-18']).map(last_bd)),
-                'CXO': pd.Series([196707339, 196304640],
-                                 index=pd.DatetimeIndex(['2020-07-26', '2020-10-23']).map(last_bd)),
+                'ALXN': pd.Series([221400872, 220827431, 218845432, 219847960, 221019230],
+                                  index=pd.DatetimeIndex(['2020-01-29', '2020-05-04', '2020-10-27', '2021-02-12',
+                                                          '2021-04-21']).map(last_bd)),
+                'ATVI': pd.Series([769221524, 770485455, 772857185, 777016759, 782306592, 782625319, 784274126,
+                                   786158727, 786798320],
+                                  index=pd.DatetimeIndex(['2020-02-20', '2020-04-28', '2020-10-22', '2021-04-27',
+                                                          '2022-07-25', '2022-10-31', '2023-02-16', '2023-04-28',
+                                                          '2023-07-24']).map(last_bd)),
+                'CERN': pd.Series([311937692, 304348600, 305381551, 306589898, 301317068, 294222760, 294098094],
+                                  index=pd.DatetimeIndex(['2020-01-28', '2020-04-23', '2020-07-22', '2020-10-21',
+                                                          '2021-04-30', '2021-10-25', '2022-04-26']).map(last_bd)),
+                'CTXS': pd.Series([123450644, 123123572, 124167045, 124230000, 124722872, 126579926, 126885081],
+                                  index=pd.DatetimeIndex(['2020-04-28', '2020-10-23', '2021-04-29', '2021-06-30',
+                                                          '2021-11-01', '2022-04-27', '2022-07-18']).map(last_bd)),
+                'CXO': pd.Series([201028695, 196706121, 196701580, 196707339, 196304640],
+                                 index=pd.DatetimeIndex(['2019-10-28', '2020-02-14', '2020-04-27',
+                                                         '2020-07-26', '2020-10-23']).map(last_bd)),
                 'DISCA': pd.Series([158566403, 160019717, 160205701, 160318208, 162490752, 169207249, 169580151],
                                    index=pd.DatetimeIndex(['2020-02-13', '2020-04-22', '2020-07-24', '2020-10-26',
-                                                           '2021-02-08','2021-10-22', '2022-02-10']).map(last_bd)),
+                                                           '2021-02-08', '2021-10-22', '2022-02-10']).map(last_bd)),
                 'DISCK': pd.Series([355843540, 340161506, 340170764, 324172931, 318331065, 330146263, 330153753],
                                    index=pd.DatetimeIndex(['2020-02-13', '2020-04-22', '2020-07-24', '2020-10-26',
                                                            '2021-02-08', '2021-10-22', '2022-02-10']).map(last_bd)),
@@ -442,14 +453,14 @@ class USStockMarketMetrics(Metrics):
                                  index=pd.DatetimeIndex(['2020-04-29', '2020-07-29', '2020-10-27', '2021-04-28',
                                                          '2021-07-28', '2021-10-27', '2022-02-16', '2022-04-27',
                                                          '2022-08-04']).map(last_bd)),
-                'ETFC': pd.Series([221046419, 221096380],
-                                  index=pd.DatetimeIndex(['2020-04-30', '2020-08-03']).map(last_bd)),
-                'FLIR': pd.Series([130842358, 131121965, 131144505, 131238445, 131932461],
-                                  index=pd.DatetimeIndex(['2020-05-01', '2020-07-31', '2020-10-23',
+                'ETFC': pd.Series([221750841, 221046419, 221096380],
+                                  index=pd.DatetimeIndex(['2020-02-14', '2020-04-30', '2020-08-03']).map(last_bd)),
+                'FLIR': pd.Series([134455332, 130842358, 131121965, 131144505, 131238445, 131932461],
+                                  index=pd.DatetimeIndex(['2020-02-25', '2020-05-01', '2020-07-31', '2020-10-23',
                                                           '2021-02-19', '2021-04-30']).map(last_bd)),
-                'INFO': pd.Series([396809671, 398612292, 398841378, 399080370],
-                                  index=pd.DatetimeIndex(['2020-05-31', '2021-05-31', '2021-08-31',
-                                                          '2021-12-31']).map(last_bd)),
+                'INFO': pd.Series([392948672, 398916408, 396809671, 398358566, 398612292, 398841378, 399080370],
+                                  index=pd.DatetimeIndex(['2019-12-31', '2020-02-29', '2020-05-31', '2020-08-31',
+                                                          '2021-05-31', '2021-08-31', '2021-12-31']).map(last_bd)),
                 'KSU': pd.Series([90964664, 90980440],
                                  index=pd.DatetimeIndex(['2021-07-09', '2021-10-12']).map(last_bd)),
                 'MXIM': pd.Series([266625382, 266695209, 267301195, 268363654, 268566248],
@@ -459,51 +470,32 @@ class USStockMarketMetrics(Metrics):
                                  index=pd.DatetimeIndex(['2020-03-31', '2020-06-30']).map(last_bd)),
                 'NLSN': pd.Series([356475591, 359941875],
                                   index=pd.DatetimeIndex(['2020-03-31', '2022-09-30']).map(last_bd)),
-                'PBCT': pd.Series([424777066, 428020009],
-                                  index=pd.DatetimeIndex(['2020-07-31', '2021-10-31']).map(last_bd)),
+                'PBCT': pd.Series([433739103, 424657609, 424777066, 428020009],
+                                  index=pd.DatetimeIndex(['2020-02-14', '2020-04-30', '2020-07-31',
+                                                          '2021-10-31']).map(last_bd)),
                 'RTN': pd.Series([278479000, 278441000],
                                  index=pd.DatetimeIndex(['2019-10-21', '2020-02-10']).map(last_bd)),
-                'SIVB': pd.Series([51796902, 58687392, 59104124],
-                                  index=pd.DatetimeIndex(['2020-10-31', '2021-10-31', '2022-10-31']).map(last_bd)),
-                'TIF': pd.Series([121368585, 121411166],
-                                 index=pd.DatetimeIndex(['2020-07-31', '2020-10-31']).map(last_bd)),
-                'TWTR': pd.Series([795349591, 798152488, 798126631, 799609869, 800641166, 764180688, 765246152],
-                                  index=pd.DatetimeIndex(['2020-10-29', '2021-02-09', '2021-04-23', '2021-10-22',
+                'SIVB': pd.Series([51513227, 51796902, 54315140, 56436504, 58687392, 58802627, 58851167, 59082305,
+                                   59104124, 59200925],
+                                  index=pd.DatetimeIndex(['2020-04-30', '2020-10-31', '2021-04-30', '2021-07-31',
+                                                          '2021-10-31', '2022-01-31', '2022-04-30', '2022-07-31',
+                                                          '2022-10-31', '2023-01-31']).map(last_bd)),
+                'TIF': pd.Series([121346674, 121368585, 121411166],
+                                 index=pd.DatetimeIndex(['2020-04-30', '2020-07-31', '2020-10-31']).map(last_bd)),
+                'TWTR': pd.Series([782287089, 784629121, 790948853, 795349591, 798152488, 798126631, 799609869,
+                                   800641166, 764180688, 765246152],
+                                  index=pd.DatetimeIndex(['2020-02-06', '2020-04-30', '2020-07-23', '2020-10-29',
+                                                          '2021-02-09', '2021-04-23', '2021-10-22',
                                                           '2022-02-10', '2022-04-22', '2022-07-22']).map(last_bd)),
-                'VAR': pd.Series([91355469, 91838813],
-                                 index=pd.DatetimeIndex(['2020-11-13', '2021-01-29']).map(last_bd)),
+                'VAR': pd.Series([90814945, 90941138, 91355469, 91838813],
+                                 index=pd.DatetimeIndex(['2020-05-01', '2020-07-31', '2020-11-13',
+                                                         '2021-01-29']).map(last_bd)),
                 'WCG': pd.Series([50312077, 50327612],
                                  index=pd.DatetimeIndex(['2019-07-26', '2019-10-28']).map(last_bd)),
                 'XEC': pd.Series([101810140, 102135577],
                                  index=pd.DatetimeIndex(['2019-10-31', '2020-01-31']).map(last_bd)),
-                'XLNX': pd.Series([243846000, 244314000, 245277000, 247468170, 247880415, 248382008],
-                                  index=pd.DatetimeIndex(['2020-04-24', '2020-07-10', '2021-01-15', '2021-07-16',
-                                                          '2021-10-15', '2022-01-14']).map(last_bd))}
-
-
-if __name__ == "__main__":
-    import sys
-    import locale
-    import traceback
-
-    try:
-        locale.setlocale(locale.LC_ALL, '')
-        start = date(2020, 1, 1)
-        end = date.today()
-
-        sp500_hist_comps = USStockMarketMetrics.get_sp500_historical_components(start)
-        sp500_hist_shares_outs = USStockMarketMetrics.get_sp500_historical_shares_outstanding()
-        sp500_metrics = USStockMarketMetrics(sp500_hist_comps, start=start, hist_shares_outs=sp500_hist_shares_outs)
-
-        print(sp500_metrics.get_top_n_capitalization_companies_for_day(10))
-        print(sp500_metrics.get_top_n_capitalization_companies_for_month(10, end))
-        print(sp500_metrics.get_capitalization().tail(32))
-        print(sp500_metrics.get_daily_turnover().tail(32))
-        print(sp500_metrics.get_annual_turnover().tail(10))
-        print(sp500_metrics.get_annual_volatility().tail(10))
-        print(f'S&P 500 forward dividend yield on {sp500_metrics.data.index[-1]:%Y-%m-%d} is '
-              f'{sp500_metrics.forward_dividend_yield:.3%}')
-
-    except Exception as ex:
-        traceback.print_exception(type(ex), ex, ex.__traceback__)
-        print("Unexpected error: ", sys.exc_info())
+                'XLNX': pd.Series([248836561, 243846000, 244314000, 245059000, 245277000, 245840000, 247468170,
+                                   247880415, 248382008],
+                                  index=pd.DatetimeIndex(['2020-01-10', '2020-04-24', '2020-07-10', '2020-10-09',
+                                                          '2021-01-15', '2021-04-30', '2021-07-16', '2021-10-15',
+                                                          '2022-01-14']).map(last_bd))}
