@@ -26,7 +26,8 @@ class Metrics:
     TRADING_DAYS_IN_YEAR = 252
     TO_ANNUAL_MULTIPLIER = sqrt(TRADING_DAYS_IN_YEAR)
 
-    def __init__(self, tickers, stock_index=None, start=None, hist_shares_outs=None):
+    def __init__(self, tickers, stock_index=None, start=None, hist_shares_outs=None,
+                 tickers_to_correct_for_splits=None):
         """
         Constructs a Metrics object out of a list of ticker symbols and an optional index ticker
 
@@ -43,6 +44,9 @@ class Metrics:
         :param hist_shares_outs: a dictionary representing historical shares outstanding for delisted tickers.
                             Each key represents a ticker symbol. Each value is a panda Series designating shares
                             outstanding on certain days.
+        :param tickers_to_correct_for_splits: Yahoo-Finance sometimes incorrectly reports close price by automatically
+                                              adjusting it for splits, this list contains ticker symbols for which
+                                              a correction is required.
         """
         self.ticker_symbols = tickers
         self.tickers = yfin.Tickers(list(self.ticker_symbols.keys()))
@@ -68,13 +72,13 @@ class Metrics:
         subset = self.data.loc[:, (self.CLOSE,)]
         delisted_tickers = subset.columns[subset.isna().all()]
         for delisted_ticker in delisted_tickers:
-            if os.path.isfile(os.path.expanduser(f'~/historical_equity_data/{delisted_ticker}.cvs')):
-                f = pd.read_csv(f'~/historical_equity_data/{delisted_ticker}.cvs', index_col=0)
+            if os.path.isfile(os.path.expanduser(f'./stock_market/historical_equity_data/{delisted_ticker}.cvs')):
+                f = pd.read_csv(f'./stock_market/historical_equity_data/{delisted_ticker}.cvs', index_col=0)
             else:
                 # Filling in the gaps with Alpha Vantage API for close prices and volumes of delisted shares
                 # Please request your own API Key in order to make the below call work
                 f = web.DataReader(delisted_ticker, 'av-daily', start=start, api_key=os.getenv('ALPHAVANTAGE_API_KEY'))
-                f.to_csv(f'~/historical_equity_data/{delisted_ticker}.cvs')
+                f.to_csv(f'./stock_market/historical_equity_data/{delisted_ticker}.cvs')
 
             f = f.set_axis(pd.DatetimeIndex(f.index, self.data.index.freq))
             f = f.loc[self.data.index[0]:, ['close', 'volume']]
@@ -87,6 +91,43 @@ class Metrics:
                 self.data.loc[f.index[-1] + BDay(1):self.ticker_symbols[delisted_ticker][1],
                               ([self.CLOSE, self.VOLUME], delisted_ticker)] = (f.iloc[-1,0], 0.)
 
+        for ticker in tickers_to_correct_for_splits:
+            if os.path.isfile(os.path.expanduser(f'./stock_market/historical_equity_data/{ticker}.cvs')):
+                f = pd.read_csv(f'./stock_market/historical_equity_data/{ticker}.cvs', index_col=0)
+            else:
+                f = web.DataReader(ticker, 'av-daily', start=start, api_key=os.getenv('ALPHAVANTAGE_API_KEY'))
+                f.to_csv(f'./stock_market/historical_equity_data/{ticker}.cvs')
+
+            f = f.set_axis(pd.DatetimeIndex(f.index, self.data.index.freq))
+            f = f.loc[self.data.index[0]:, ['close', 'volume']]
+            f.columns = pd.MultiIndex.from_tuples(list(zip([self.CLOSE, self.VOLUME], [ticker]*2)))
+
+            split_date = None
+            # Detecting many for one stock conversions
+            pct_change = f.loc[:, (self.CLOSE, ticker)].pct_change()
+            k = pct_change.loc[pct_change >= 0.95]
+            if len(k) > 0:
+                split_date = k.index[0]
+                # print(f'\tMore than 95% price increase suggests a many-to-one stock conversion for {ticker}')
+
+            splits = self.tickers.tickers[ticker].splits
+            if splits is not None and len(splits) > 0 and (split_date is None or
+                                                           splits.index[-1].tz_localize(None) > split_date):
+                split_date = splits.index[-1].tz_localize(None)
+                # print(f'\tYahoo-Finance API identified split date {split_date:%Y-%m-%d} for {ticker}')
+
+            # Unfortunately Yahoo-Finance API occasionally fails to report the most recent splits
+            # Detecting one for many stock splits
+            pct_change = f.loc[:, (self.CLOSE, ticker)].iloc[::-1].pct_change()
+            k = pct_change.loc[pct_change >= 0.95]
+            if len(k) > 0 and (split_date is None or k.index[0] > split_date):
+                split_date = k.index[0] + BDay(1)
+                # print(f'\tMore than 95% price drop suggests a split date {split_date:%Y-%m-%d} for {ticker}')
+
+            print(f'Adjusting closing prices before the split date on {split_date:%Y-%m-%d} for {ticker}')
+            self.data.loc[self.data.index[0]:split_date-BDay(1), ([self.CLOSE, self.VOLUME], ticker)]\
+                = f.loc[self.data.index[0]:split_date-BDay(1)]
+
         self.shares_outstanding = {}
         for ticker in self.ticker_symbols.keys():
 
@@ -98,8 +139,9 @@ class Metrics:
 
             # In case the historical shares outstanding dictionary has an entry, use it in preference to
             # Yahoo-Finance's API
-            elif hist_shares_outs is not None and ticker in hist_shares_outs:
-                shares_outst = hist_shares_outs[ticker]
+            # elif hist_shares_outs is not None and ticker in hist_shares_outs \
+            #         and (tickers_to_correct_for_splits is None or ticker not in tickers_to_correct_for_splits):
+            #     shares_outst = hist_shares_outs[ticker]
 
             else:
                 shares_outst = self.tickers.tickers[ticker].get_shares_full(start=start).tz_localize(None)
@@ -117,8 +159,21 @@ class Metrics:
                     print('Correcting the number of shares outstanding for {:s} from {:d} to {:d}'
                           .format(ticker, shares_outst.iloc[-1].item(),
                                   int(shares_outst.iloc[-1].item() * shares_outstanding / shares_outstanding2)))
+
                     shares_outst *= shares_outstanding / float(shares_outstanding2)
                     shares_outst = shares_outst.astype('int64')
+
+                # Correcting for shares outstanding based ont he override in hist_shares_outs
+                if hist_shares_outs is not None and ticker in hist_shares_outs:
+                    correction = hist_shares_outs[ticker]
+                    missing_dates_back = shares_outst.loc[:correction.index[-1]].index.difference(correction.index)
+                    missing_dates_back = missing_dates_back.union(
+                        self.data.loc[:correction.index[-1]].index.difference(correction.index))
+                    correction = pd.concat([correction, pd.Series(np.nan, index=missing_dates_back)]).sort_index()
+                    correction = correction.bfill()
+                    shares_outst.update(correction)
+                    print('\tExtra correction for the number of shares outstanding for {:s} for period '
+                          'from {:%Y-%m-%d} to {:%Y-%m-%d}'.format(ticker, self.data.index[0], correction.index[-1]))
 
             # Yahoo-Finance doesn't report shares outstanding for each trading day. I compensate for it by rolling
             # forward the most recent reported value and then rolling backward the earliest available number.
@@ -200,7 +255,11 @@ class Metrics:
         """
         if dt is None:
             dt = self.data.index[-1]
-        dt = BDay(0).rollback(dt) if BDay(0).rollback(dt) <= self.data.index[-1] else self.data.index[-1]
+        idx = -1
+        dt = BDay(0).rollback(dt) if BDay(0).rollback(dt) <= self.data.index[idx] else self.data.index[idx]
+        while np.isnan(self.capitalization.loc[dt, self.CAPITALIZATION]):
+            idx -= 1
+            dt = self.data.index[idx]
         topn = self.capitalization.loc[dt, self.capitalization.columns[2:]].nlargest(n).to_frame(self.CAPITALIZATION)
         topn[self.MKT_SHARE] = topn.iloc[:, 0] / self.capitalization.loc[dt, self.CAPITALIZATION]
         return topn
@@ -218,7 +277,8 @@ class Metrics:
         """
         if dt is None:
             dt = self.data.index[-1]
-        dt = MonthBegin(0).rollback(dt) if MonthBegin(0).rollback(dt) <= self.data.index[-1] else self.data.index[-1]
+        dt = MonthBegin(0).rollback(dt) if MonthBegin(0).rollback(dt) <= self.data.index[-1]\
+            else MonthBegin(0).rollback(self.data.index[-1])
         resampled_cap = self.capitalization.resample('MS').mean()
         topn = resampled_cap.loc[dt, resampled_cap.columns[2:]].nlargest(n).to_frame(self.CAPITALIZATION)
         topn[self.MKT_SHARE] = topn.iloc[:, 0] / resampled_cap.loc[dt, self.CAPITALIZATION]
@@ -237,7 +297,8 @@ class Metrics:
         """
         if dt is None:
             dt = self.data.index[-1]
-        dt = YearBegin(0).rollback(dt) if YearBegin(0).rollback(dt) <= self.data.index[-1] else self.data.index[-1]
+        dt = YearBegin(0).rollback(dt) if YearBegin(0).rollback(dt) <= self.data.index[-1]\
+            else YearBegin(0).rollback(self.data.index[-1])
         resampled_cap = self.capitalization.resample('AS').mean()
         topn = resampled_cap.loc[dt, resampled_cap.columns[2:]].nlargest(n).to_frame(self.CAPITALIZATION)
         topn[self.MKT_SHARE] = topn.iloc[:, 0] / resampled_cap.loc[dt, self.CAPITALIZATION]
@@ -351,7 +412,11 @@ class USStockMarketMetrics(Metrics):
                             Each key represents a ticker symbol. Each value is a panda Series designating shares
                             outstanding on certain days.
         """
-        super().__init__(tickers, stock_index, start, hist_shares_outs)
+        # Unfortunately Yahoo-Finance reports incorrect closing prices for Alphabet shares before its stock split
+        super().__init__(tickers, stock_index, start, hist_shares_outs, ['GOOG', 'GOOGL', 'AMZN', 'AAPL', 'NDAQ', 'AIV',
+                                                                         'ANET', 'TECH', 'COO', 'NVDA', 'TSLA', 'CPRT',
+                                                                         'CSGP', 'CSX', 'DXCM', 'EW', 'FTNT', 'ISRG',
+                                                                         'MNST', 'NEE', 'PANW', 'SHW', 'WMT', 'GE'])
 
     @staticmethod
     def get_sp500_components():
@@ -381,8 +446,7 @@ class USStockMarketMetrics(Metrics):
         start = pd.to_datetime(start)
         all_components = USStockMarketMetrics.get_sp500_components().copy()
         ret = {ticker: (start, None) for ticker in all_components}
-        # current_tickers = frozenset(all_components)
-        # vals = []
+        removed_tickers = set()
 
         df = pd.read_csv('./stock_market/sp500_changes_since_2019.csv', index_col=[0])
         for idx, row in df[::-1].iterrows():
@@ -395,17 +459,9 @@ class USStockMarketMetrics(Metrics):
 
             for removed_ticker in row[1].split(','):
                 ret[removed_ticker] = (start, ts-BDay(1))
+                removed_tickers.add(removed_ticker)
                 all_components.append(removed_ticker)
 
-            # vals = [(pd.to_datetime(idx), current_tickers)]
-            # current_tickers -= frozenset(row[0].split(','))
-            # current_tickers |= frozenset(row[1].split(','))
-            # print(f'On {pd.to_datetime(idx):%Y-%m-%d} the index had {len(vals[-1][1]):d} components')
-            # assert current_tickers != vals[-1][1], "not different"
-            # assert 500 <= len(current_tickers) <= 505, "wrong length"
-
-        # vals.append((BYearBegin(1).rollback(vals[-1][0]), current_tickers))
-        # print(vals)
         if len(all_components) > len(ret):
             raise ValueError('Some tickers were added twice during the implied period')
 
@@ -430,6 +486,11 @@ class USStockMarketMetrics(Metrics):
                                   index=pd.DatetimeIndex(['2020-02-20', '2020-04-28', '2020-10-22', '2021-04-27',
                                                           '2022-07-25', '2022-10-31', '2023-02-16', '2023-04-28',
                                                           '2023-07-24']).map(last_bd)),
+                'BRK-B': pd.Series([1385994959, 1401356454, 1390707370, 1370951744, 1336348609, 1326572128, 1325373100,
+                                    1303476707, 1291212661, 1285751332, 1301126370],
+                                   index=pd.DatetimeIndex(['2020-02-13', '2020-07-30', '2020-08-23', '2020-10-26',
+                                                           '2021-02-16', '2021-04-22', '2021-07-26', '2021-10-27',
+                                                           '2022-02-14', '2022-04-20', '2022-07-26']).map(last_bd)),
                 'CERN': pd.Series([311937692, 304348600, 305381551, 306589898, 301317068, 294222760, 294098094],
                                   index=pd.DatetimeIndex(['2020-01-28', '2020-04-23', '2020-07-22', '2020-10-21',
                                                           '2021-04-30', '2021-10-25', '2022-04-26']).map(last_bd)),
@@ -458,6 +519,16 @@ class USStockMarketMetrics(Metrics):
                 'FLIR': pd.Series([134455332, 130842358, 131121965, 131144505, 131238445, 131932461],
                                   index=pd.DatetimeIndex(['2020-02-25', '2020-05-01', '2020-07-31', '2020-10-23',
                                                           '2021-02-19', '2021-04-30']).map(last_bd)),
+                'GOOG': pd.Series([340979832, 336162278, 333631113, 329867212, 327556472, 323580001, 320168491,
+                                   317737778, 315639479, 313376417],
+                                  index=pd.DatetimeIndex(['2020-01-27', '2020-04-21', '2020-07-23', '2020-10-22',
+                                                          '2021-01-26', '2021-04-20', '2021-07-20', '2021-10-19',
+                                                          '2022-01-25', '2022-04-19']).map(last_bd)),
+                'GOOGL': pd.Series([299895185, 300050444, 300471156, 300643829, 300737081, 300746844, 301084627,
+                                    300809676, 300754904, 300763622],
+                                   index=pd.DatetimeIndex(['2020-01-27', '2020-04-21', '2020-07-23', '2020-10-22',
+                                                           '2021-01-26', '2021-04-20', '2021-07-20', '2021-10-19',
+                                                           '2022-01-25', '2022-04-19']).map(last_bd)),
                 'INFO': pd.Series([392948672, 398916408, 396809671, 398358566, 398612292, 398841378, 399080370],
                                   index=pd.DatetimeIndex(['2019-12-31', '2020-02-29', '2020-05-31', '2020-08-31',
                                                           '2021-05-31', '2021-08-31', '2021-12-31']).map(last_bd)),
