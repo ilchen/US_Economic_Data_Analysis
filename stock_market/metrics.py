@@ -87,7 +87,8 @@ class Metrics:
 
             # In case delisting took place before a formal removal from the market, I replicate the last closing price
             # and assign a volume of 0 to the trading days leading up to the delisting
-            if f.index[-1] < self.ticker_symbols[delisted_ticker][1]:
+            if self.ticker_symbols[delisted_ticker][1] is not None \
+                    and f.index[-1] < self.ticker_symbols[delisted_ticker][1]:
                 self.data.loc[f.index[-1] + BDay(1):self.ticker_symbols[delisted_ticker][1],
                               ([self.CLOSE, self.VOLUME], delisted_ticker)] = (f.iloc[-1,0], 0.)
 
@@ -487,10 +488,11 @@ class USStockMarketMetrics(Metrics):
                                                           '2022-07-25', '2022-10-31', '2023-02-16', '2023-04-28',
                                                           '2023-07-24']).map(last_bd)),
                 'BRK-B': pd.Series([1385994959, 1401356454, 1390707370, 1370951744, 1336348609, 1326572128, 1325373100,
-                                    1303476707, 1291212661, 1285751332, 1301126370],
+                                    1303476707, 1291212661, 1285751332, 1301126370, 1301981370, 1301100243, 1295970861],
                                    index=pd.DatetimeIndex(['2020-02-13', '2020-07-30', '2020-08-23', '2020-10-26',
                                                            '2021-02-16', '2021-04-22', '2021-07-26', '2021-10-27',
-                                                           '2022-02-14', '2022-04-20', '2022-07-26']).map(last_bd)),
+                                                           '2022-02-14', '2022-04-20', '2022-07-26', '2022-10-26',
+                                                           '2023-02-13', '2023-04-25']).map(last_bd)),
                 'CERN': pd.Series([311937692, 304348600, 305381551, 306589898, 301317068, 294222760, 294098094],
                                   index=pd.DatetimeIndex(['2020-01-28', '2020-04-23', '2020-07-22', '2020-10-21',
                                                           '2021-04-30', '2021-10-25', '2022-04-26']).map(last_bd)),
