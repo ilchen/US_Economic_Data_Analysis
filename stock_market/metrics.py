@@ -92,42 +92,42 @@ class Metrics:
                 self.data.loc[f.index[-1] + BDay(1):self.ticker_symbols[delisted_ticker][1],
                               ([self.CLOSE, self.VOLUME], delisted_ticker)] = (f.iloc[-1,0], 0.)
 
-        for ticker in tickers_to_correct_for_splits:
-            if os.path.isfile(os.path.expanduser(f'./stock_market/historical_equity_data/{ticker}.cvs')):
-                f = pd.read_csv(f'./stock_market/historical_equity_data/{ticker}.cvs', index_col=0)
-            else:
-                f = web.DataReader(ticker, 'av-daily', start=start, api_key=os.getenv('ALPHAVANTAGE_API_KEY'))
-                f.to_csv(f'./stock_market/historical_equity_data/{ticker}.cvs')
+        if tickers_to_correct_for_splits is not None:
+            # Ensure we don't bother with tickers that are not part of the market
+            tickers_to_correct_for_splits = set(tickers_to_correct_for_splits) & self.ticker_symbols.keys()
+            for ticker in tickers_to_correct_for_splits:
+                if os.path.isfile(os.path.expanduser(f'./stock_market/historical_equity_data/{ticker}.cvs')):
+                    f = pd.read_csv(f'./stock_market/historical_equity_data/{ticker}.cvs', index_col=0)
+                else:
+                    f = web.DataReader(ticker, 'av-daily', start=start, api_key=os.getenv('ALPHAVANTAGE_API_KEY'))
+                    f.to_csv(f'./stock_market/historical_equity_data/{ticker}.cvs')
 
-            f = f.set_axis(pd.DatetimeIndex(f.index, self.data.index.freq))
-            f = f.loc[self.data.index[0]:, ['close', 'volume']]
-            f.columns = pd.MultiIndex.from_tuples(list(zip([self.CLOSE, self.VOLUME], [ticker]*2)))
+                f = f.set_axis(pd.DatetimeIndex(f.index, self.data.index.freq))
+                f = f.loc[self.data.index[0]:, ['close', 'volume']]
+                f.columns = pd.MultiIndex.from_tuples(list(zip([self.CLOSE, self.VOLUME], [ticker]*2)))
 
-            split_date = None
-            # Detecting many for one stock conversions
-            pct_change = f.loc[:, (self.CLOSE, ticker)].pct_change()
-            k = pct_change.loc[pct_change >= 0.95]
-            if len(k) > 0:
-                split_date = k.index[0]
-                # print(f'\tMore than 95% price increase suggests a many-to-one stock conversion for {ticker}')
+                split_date = None
+                # Detecting many for one stock conversions
+                pct_change = f.loc[:, (self.CLOSE, ticker)].pct_change()
+                k = pct_change.loc[pct_change >= 0.95]
+                if len(k) > 0:
+                    split_date = k.index[0]
 
-            splits = self.tickers.tickers[ticker].splits
-            if splits is not None and len(splits) > 0 and (split_date is None or
-                                                           splits.index[-1].tz_localize(None) > split_date):
-                split_date = splits.index[-1].tz_localize(None)
-                # print(f'\tYahoo-Finance API identified split date {split_date:%Y-%m-%d} for {ticker}')
+                splits = self.tickers.tickers[ticker].splits
+                if splits is not None and len(splits) > 0 and (split_date is None or
+                                                               splits.index[-1].tz_localize(None) > split_date):
+                    split_date = splits.index[-1].tz_localize(None)
 
-            # Unfortunately Yahoo-Finance API occasionally fails to report the most recent splits
-            # Detecting one for many stock splits
-            pct_change = f.loc[:, (self.CLOSE, ticker)].iloc[::-1].pct_change()
-            k = pct_change.loc[pct_change >= 0.95]
-            if len(k) > 0 and (split_date is None or k.index[0] > split_date):
-                split_date = k.index[0] + BDay(1)
-                # print(f'\tMore than 95% price drop suggests a split date {split_date:%Y-%m-%d} for {ticker}')
+                # Unfortunately Yahoo-Finance API occasionally fails to report the most recent splits
+                # Detecting one for many stock splits
+                pct_change = f.loc[:, (self.CLOSE, ticker)].iloc[::-1].pct_change()
+                k = pct_change.loc[pct_change >= 0.95]
+                if len(k) > 0 and (split_date is None or k.index[0] > split_date):
+                    split_date = k.index[0] + BDay(1)
 
-            print(f'Adjusting closing prices before the split date on {split_date:%Y-%m-%d} for {ticker}')
-            self.data.loc[self.data.index[0]:split_date-BDay(1), ([self.CLOSE, self.VOLUME], ticker)]\
-                = f.loc[self.data.index[0]:split_date-BDay(1)]
+                print(f'Adjusting closing prices before the split date on {split_date:%Y-%m-%d} for {ticker}')
+                self.data.loc[self.data.index[0]:split_date-BDay(1), ([self.CLOSE, self.VOLUME], ticker)]\
+                    = f.loc[self.data.index[0]:split_date-BDay(1)]
 
         self.shares_outstanding = {}
         for ticker in self.ticker_symbols.keys():
@@ -417,7 +417,10 @@ class USStockMarketMetrics(Metrics):
         super().__init__(tickers, stock_index, start, hist_shares_outs, ['GOOG', 'GOOGL', 'AMZN', 'AAPL', 'NDAQ', 'AIV',
                                                                          'ANET', 'TECH', 'COO', 'NVDA', 'TSLA', 'CPRT',
                                                                          'CSGP', 'CSX', 'DXCM', 'EW', 'FTNT', 'ISRG',
-                                                                         'MNST', 'NEE', 'PANW', 'SHW', 'WMT', 'GE'])
+                                                                         'MNST', 'NEE', 'PANW', 'SHW', 'WMT', 'GE',
+                                                                         'ODFL', 'MCHP', 'APH', 'DTE', 'FTV', 'MTCH',
+                                                                         'MKC', 'MRK', 'PFE', 'RJF', 'RTX', 'ROL',
+                                                                         'TT', 'SLG', 'FTI'])
 
     @staticmethod
     def get_sp500_components():
@@ -458,7 +461,7 @@ class USStockMarketMetrics(Metrics):
                 _, end = ret[added_ticker]
                 ret[added_ticker] = (ts, end)
 
-            for removed_ticker in row[1].split(','):
+            for removed_ticker in [] if pd.isnull(row[1]) else row[1].split(','):
                 ret[removed_ticker] = (start, ts-BDay(1))
                 removed_tickers.add(removed_ticker)
                 all_components.append(removed_ticker)
@@ -560,6 +563,11 @@ class USStockMarketMetrics(Metrics):
                                   index=pd.DatetimeIndex(['2020-02-06', '2020-04-30', '2020-07-23', '2020-10-29',
                                                           '2021-02-09', '2021-04-23', '2021-10-22',
                                                           '2022-02-10', '2022-04-22', '2022-07-22']).map(last_bd)),
+                'V': pd.Series([1706024403, 1687112437, 1686007156, 1692383762, 1696113603, 1691806129, 1687643027,
+                                1669730762, 1658423632, 1645719350, 1635014650],
+                               index=pd.DatetimeIndex(['2020-01-24', '2020-04-30', '2020-07-24', '2020-11-13',
+                                                       '2021-01-22', '2021-04-23', '2021-07-23', '2021-11-10',
+                                                       '2022-01-29', '2022-04-20', '2022-07-20']).map(last_bd)),
                 'VAR': pd.Series([90814945, 90941138, 91355469, 91838813],
                                  index=pd.DatetimeIndex(['2020-05-01', '2020-07-31', '2020-11-13',
                                                          '2021-01-29']).map(last_bd)),
