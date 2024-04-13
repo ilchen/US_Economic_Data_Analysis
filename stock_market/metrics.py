@@ -217,7 +217,7 @@ class Metrics:
         self.forward_dividend_yield /= self.capitalization.iloc[-1,0]
         self.forward_PE /= self.capitalization.iloc[-1,0]
 
-        # Given that a stock index is used for calculating the volatility, we need to use adjusted close prices.
+        # Given that a stock index is used for calculating volatility, we need to use adjusted close prices.
         if stock_index is not None:
             self.stock_index_data = yfin.download(
                 stock_index, start=start, auto_adjust=True, actions=False, ignore_tz=True)\
@@ -522,6 +522,9 @@ class USStockMarketMetrics(Metrics):
                                  index=pd.DatetimeIndex(['2020-04-29', '2020-07-29', '2020-10-27', '2021-04-28',
                                                          '2021-07-28', '2021-10-27', '2022-02-16', '2022-04-27',
                                                          '2022-08-04']).map(last_bd)),
+                'EL': pd.Series([222319332, 224763197, 225569212, 226538215, 229736467, 231894845, 233045213],
+                                index=pd.DatetimeIndex(['2020-01-30', '2020-04-24', '2020-08-20', '2020-10-26',
+                                                        '2021-01-29', '2021-04-26', '2021-08-20']).map(last_bd)),
                 'ETFC': pd.Series([221750841, 221046419, 221096380],
                                   index=pd.DatetimeIndex(['2020-02-14', '2020-04-30', '2020-08-03']).map(last_bd)),
                 'FLIR': pd.Series([134455332, 130842358, 131121965, 131144505, 131238445, 131932461],
