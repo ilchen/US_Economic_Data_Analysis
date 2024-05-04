@@ -85,12 +85,16 @@ class Metrics:
             f.columns = pd.MultiIndex.from_tuples(list(zip([self.CLOSE, self.VOLUME], [delisted_ticker]*2)))
             self.data.loc[f.index, ([self.CLOSE, self.VOLUME], delisted_ticker)] = f
 
+        # Walk through all tickers that are no longer part of S&P 500 and fill in missing prices (if any) for
+        # those that have been delisted
+        for delisted_ticker in [k for (k, (st, ed)) in tickers.items() if ed is not None]:
+            ed = min(tickers[delisted_ticker][1], self.data.index[-1])
+            f = self.data.loc[:, (self.CLOSE, delisted_ticker)]
+            st = f.last_valid_index()
             # In case delisting took place before a formal removal from the market, I replicate the last closing price
             # and assign a volume of 0 to the trading days leading up to the delisting
-            if self.ticker_symbols[delisted_ticker][1] is not None \
-                    and f.index[-1] < self.ticker_symbols[delisted_ticker][1]:
-                self.data.loc[f.index[-1] + BDay(1):self.ticker_symbols[delisted_ticker][1],
-                              ([self.CLOSE, self.VOLUME], delisted_ticker)] = (f.iloc[-1,0], 0.)
+            if st < ed:
+                self.data.loc[st + BDay(1):ed, ([self.CLOSE, self.VOLUME], delisted_ticker)] = (f.loc[st], 0.)
 
         if tickers_to_correct_for_splits is not None:
             # Ensure we don't bother with tickers that are not part of the market
@@ -392,6 +396,47 @@ class Metrics:
         Returns the current set of components in a given stock market.
         """
         return [k for k, (st, ed) in self.ticker_symbols.items() if ed is None]
+
+    def get_beta(self, tickers, years=5, use_adjusted_close=False):
+        """
+        Calculates the Capital Asset Pricing Model beta of a group of stocks represented by 'tickers' relative to the
+        market portfolio represented by 'self.stock_index_data', if any. It uses prices at the beginning of each
+        month and goes back to min('years', start-date-used-to-construct-this-object). When multiple tickers are
+        specified, assumes an equal allocation of funds to each stock.
+
+        :param tickers: a list of one or more ticker symbols
+        :param years: an integer designating how many years in the past to go to calculate the beta of the portfolio
+                      made up of 'tickers'
+        :param use_adjusted_close: indicates whether to use adjusted closing prices, which produces more accurate
+                                   results at the expense of extra network calls to Yahoo-Finance APIs
+        :returns: a pd.Series object capturing the beta or None if self.stock_index_data
+        """
+        if self.stock_index_data is None:
+            return None
+        n = len(tickers)
+        st = MonthBegin(0).rollback(self.stock_index_data.index[-1] - pd.DateOffset(years=years))
+        if use_adjusted_close:
+            tickers = yfin.Tickers(tickers) if n > 1 else yfin.Ticker(tickers[0])
+            # When calculating the Beta of a portfolio relative to the market, it's better to use adjusted close prices
+            # and not adjusted close prices
+            if n > 1:
+                portfolio = tickers.download(start=MonthBegin(0).rollback(self.stock_index_data.index[0]),
+                                             auto_adjust=True, actions=False, ignore_tz=True)
+            else:
+                portfolio = tickers.history(start=MonthBegin(0).rollback(self.stock_index_data.index[0]),
+                                            auto_adjust=True, actions=False)
+                portfolio.index = portfolio.index.tz_localize(None)
+            portfolio = portfolio.loc[:, Metrics.CLOSE]
+        else:
+            portfolio = self.data.loc[:, (Metrics.CLOSE, tickers)]
+        if n > 1:
+            weights = pd.Series([1. / n] * n, index=portfolio.columns)
+            weights = weights.div(portfolio.iloc[0,:])
+            portfolio = portfolio.mul(weights, axis=1)
+            portfolio = portfolio.sum(axis=1)
+        portfolio = portfolio.resample('MS').first().pct_change().loc[st:].dropna().squeeze()
+        market = self.stock_index_data.resample('MS').first().pct_change().loc[st:].dropna()
+        return market.cov(portfolio) / market.var()
 
 
 class USStockMarketMetrics(Metrics):
