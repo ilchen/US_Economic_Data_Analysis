@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from pandas.tseries.offsets import YearBegin, BDay, MonthBegin
 import pandas_datareader.data as web
-from math import sqrt
+from math import sqrt, isclose
 from datetime import date, time, datetime
 import os
 import warnings
@@ -397,14 +397,16 @@ class Metrics:
         """
         return [k for k, (st, ed) in self.ticker_symbols.items() if ed is None]
 
-    def get_beta(self, tickers, years=5, use_adjusted_close=False):
+    def get_beta(self, tickers, weights=None, years=5, use_adjusted_close=False):
         """
         Calculates the Capital Asset Pricing Model beta of a group of stocks represented by 'tickers' relative to the
         market portfolio represented by 'self.stock_index_data', if any. It uses prices at the beginning of each
         month and goes back to min('years', start-date-used-to-construct-this-object). When multiple tickers are
-        specified, assumes an equal allocation of funds to each stock.
+        specified, assumes an equal allocation of funds to each stock unlessed overridden with the 'weights' parameter.
 
         :param tickers: a list of one or more ticker symbols
+        :param weights: a list of float numbers summing up to 1. If more than one ticker symbol is specified, it
+                        determines how much to allocate to a particular stock in a portfolio made up of 'tickers'
         :param years: an integer designating how many years in the past to go to calculate the beta of the portfolio
                       made up of 'tickers'
         :param use_adjusted_close: indicates whether to use adjusted closing prices, which produces more accurate
@@ -430,8 +432,16 @@ class Metrics:
         else:
             portfolio = self.data.loc[:, (Metrics.CLOSE, tickers)]
         if n > 1:
-            weights = pd.Series([1. / n] * n, index=portfolio.columns)
-            weights = weights.div(portfolio.iloc[0,:])
+            if weights is None:
+                weights = pd.Series([1. / n] * n, index=portfolio.columns)
+            else:
+                if len(weights) != n or not isclose(sum(weights), 1.):
+                    raise ValueError('Weights are not specified correctly')
+                if not isinstance(weights, pd.Series):
+                    weights = pd.Series(weights, index=portfolio.columns)
+                else:
+                    weights.index = portfolio.columns
+            weights = weights.div(portfolio.iloc[0, :])
             portfolio = portfolio.mul(weights, axis=1)
             portfolio = portfolio.sum(axis=1)
         portfolio = portfolio.resample('MS').first().pct_change().loc[st:].dropna().squeeze()
