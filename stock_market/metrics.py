@@ -222,10 +222,15 @@ class Metrics:
         self.forward_PE /= self.capitalization.iloc[-1,0]
 
         # Given that a stock index is used for calculating volatility, we need to use adjusted close prices.
+        self.stock_index_data = stock_index
         if stock_index is not None:
+            # Handy to get earlier data for the index for more accurate estimate of volatility
             self.stock_index_data = yfin.download(
-                stock_index, start=start, auto_adjust=True, actions=False, ignore_tz=True)\
+                stock_index, start=start - pd.DateOffset(years=3), auto_adjust=True, actions=False, ignore_tz=True)\
                     .loc[:, Metrics.ADJ_CLOSE]
+        
+        # Must be initialized in a subclass
+        self.riskless_rate = None
 
     def get_capitalization(self, frequency='M', tickers=None):
         """
@@ -389,7 +394,8 @@ class Metrics:
         if self.stock_index_data is None:
             return None
         vol = self.stock_index_data.pct_change().ewm(alpha=alpha).std() * self.TO_ANNUAL_MULTIPLIER
-        return vol.resample(frequency).mean().dropna().rename(self.VOLATILITY)
+        st = MonthBegin(0).rollback(self.data.index[0])
+        return vol.resample(frequency).mean().dropna().rename(self.VOLATILITY).loc[st:]
 
     def get_current_components(self):
         """
@@ -422,10 +428,10 @@ class Metrics:
             # When calculating the Beta of a portfolio relative to the market, it's better to use adjusted close prices
             # and not adjusted close prices
             if n > 1:
-                portfolio = tickers.download(start=MonthBegin(0).rollback(self.stock_index_data.index[0]),
+                portfolio = tickers.download(start=MonthBegin(0).rollback(self.data.index[0]),
                                              auto_adjust=True, actions=False, ignore_tz=True)
             else:
-                portfolio = tickers.history(start=MonthBegin(0).rollback(self.stock_index_data.index[0]),
+                portfolio = tickers.history(start=MonthBegin(0).rollback(self.data.index[0]),
                                             auto_adjust=True, actions=False)
                 portfolio.index = portfolio.index.tz_localize(None)
             portfolio = portfolio.loc[:, Metrics.CLOSE]
@@ -446,9 +452,66 @@ class Metrics:
             portfolio = portfolio.sum(axis=1)
         portfolio = portfolio.resample('MS').first().pct_change().loc[st:].dropna().squeeze()
         market = self.stock_index_data.resample('MS').first().pct_change().loc[st:].dropna()
+        common_index = portfolio.index.intersection(market.index)
+        portfolio = portfolio.loc[common_index[0]:]
+        market = market.loc[common_index[0]:]
         return market.cov(portfolio) / market.var()
+    
+    def get_excess_return_helper(self, years=2, frequency='M', sharpe_ratio=False):
+        """
+        Calculates either an excess return of the marker over the riskless rate or ex-post Sharpe ratio
+        of the market represented by this object.
 
+        :param years: an integer designating how many years in the past to go to calculate the volatility of the market
+                      that this object represents
+        :param frequency: a standard Pandas frequency designator
+            https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#timeseries-offset-aliases must
+            be limited to M, BM, MS, or BMS.
+        :param sharpe_ratio: a boolean indicating what to return: if False calculate excess returns, if True the
+                             Sharpe ratio
+        :returns: a pd.Series object capturing the Sharpe ratio of the market represented by this object
+        """
+        if self.stock_index_data is None or self.riskless_rate is None:
+            return None
+        if frequency not in ['M', 'BM', 'MS', 'BMS']:
+            raise ValueError(f'Frequency {frequency} is not supported')
+        if frequency in ['MS', 'BMS']:
+            riskless_rate = self.riskless_rate.resample(frequency).first()
+            market = self.stock_index_data.resample(frequency).first()
+        else:
+            riskless_rate = self.riskless_rate.resample(frequency).last()
+            market = self.stock_index_data.resample(frequency).last()
+        market = market.pct_change(12).dropna()
+        riskless_rate = riskless_rate.shift(12).dropna()
+        volatility = market.rolling(12 * years).std().dropna()
 
+        common_index = volatility.index.intersection(market.index).intersection(riskless_rate.index)
+        st = max(MonthBegin(0).rollback(self.data.index[0]), common_index[0])
+        volatility = volatility.loc[st:]
+        market = market.loc[st:]
+        riskless_rate = riskless_rate.loc[st:]
+        return (market - riskless_rate) / volatility if sharpe_ratio else market - riskless_rate
+
+    def get_excess_return(self, years=2, frequency='M'):
+        """
+        Calculates ex-post excess annual return of the market represented by this object over 1-year riskless rate.
+        """
+        return self.get_excess_return_helper(years, frequency, False)
+
+    def get_sharpe_ratio(self, years=2, frequency='M'):
+        """
+        Calculates ex-post Sharpe ratio of the market represented by this object.
+
+        :param years: an integer designating how many years in the past to go to calculate the volatility of the market
+                      that this object represents
+        :param frequency: a standard Pandas frequency designator
+            https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#timeseries-offset-aliases must
+            be limited to M, BM, MS, or BMS.
+        :returns: a pd.Series object capturing the Sharpe ratio of the market represented by this object
+        """
+        return self.get_excess_return_helper(years, frequency, True)
+
+    
 class USStockMarketMetrics(Metrics):
     def __init__(self, tickers, stock_index='^GSPC', start=None, hist_shares_outs=None):
         """
@@ -476,6 +539,13 @@ class USStockMarketMetrics(Metrics):
                                                                          'ODFL', 'MCHP', 'APH', 'DTE', 'FTV', 'MTCH',
                                                                          'MKC', 'MRK', 'PFE', 'RJF', 'RTX', 'ROL',
                                                                          'TT', 'SLG', 'FTI'])
+
+        # Using Market Yield on U.S. Treasury Securities at 1-Year Constant Maturity, as proxy for riskless rate
+        # Handy to get earlier data for more accurate estimates of volatility
+        self.riskless_rate = web.get_data_fred('DGS1', start - pd.DateOffset(years=3))
+
+        # Convert into pd.Series and percentage points
+        self.riskless_rate = self.riskless_rate.dropna().iloc[:,0] / 100.
 
     @staticmethod
     def get_sp500_components():
