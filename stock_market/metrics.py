@@ -538,7 +538,7 @@ class USStockMarketMetrics(Metrics):
                                                                          'MNST', 'NEE', 'PANW', 'SHW', 'WMT', 'GE',
                                                                          'ODFL', 'MCHP', 'APH', 'DTE', 'FTV', 'MTCH',
                                                                          'MKC', 'MRK', 'PFE', 'RJF', 'RTX', 'ROL',
-                                                                         'TT', 'SLG', 'FTI'])
+                                                                         'TT', 'SLG', 'FTI', 'NVDA'])
 
         # Using Market Yield on U.S. Treasury Securities at 1-Year Constant Maturity, as proxy for riskless rate
         # Handy to get earlier data for more accurate estimates of volatility
