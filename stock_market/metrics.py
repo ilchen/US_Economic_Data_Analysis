@@ -26,7 +26,7 @@ class Metrics:
     TRADING_DAYS_IN_YEAR = 252
     TO_ANNUAL_MULTIPLIER = sqrt(TRADING_DAYS_IN_YEAR)
 
-    def __init__(self, tickers, stock_index=None, start=None, hist_shares_outs=None,
+    def __init__(self, tickers, additional_share_classes=None, stock_index=None, start=None, hist_shares_outs=None,
                  tickers_to_correct_for_splits=None):
         """
         Constructs a Metrics object out of a list of ticker symbols and an optional index ticker
@@ -36,6 +36,9 @@ class Metrics:
                         end day of the stock represented by the ticker being added or removed. An end value of None
                         implies it's still part of the market, a start value of None designates it becoming part of
                         the marke before 'start'
+        :param additional_share_classes: a dictionary whose keys are additional share classes of companies
+                                         that have multiple share classes and where they all are part of the market,
+                                         the values are the first share class (typically class A)
         :param stock_index: an optional ticker symbol of the index that corresponds to the market represented
                             by the 'tickers' parameter
         :param start: (string, int, date, datetime, Timestamp) – Starting date. Parses different kinds of date
@@ -231,6 +234,11 @@ class Metrics:
         
         # Must be initialized in a subclass
         self.riskless_rate = None
+        
+        # Required for the 'get_quarterly_stmt_data' and get_top_n_capitalization_for_x methods 
+        if additional_share_classes is None:
+            additional_share_classes = {}
+        self.additional_share_classes = additional_share_classes
 
     def get_capitalization(self, frequency='M', tickers=None):
         """
@@ -252,13 +260,21 @@ class Metrics:
                 ret += self.data.loc[st:ed, (Metrics.CLOSE, ticker)] * self.shares_outstanding[ticker].loc[st:ed]
             return ret.resample(frequency).mean().ret.dropna()
 
-    def get_top_n_capitalization_companies_for_day(self, n, dt=None):
+    def adjust_for_additional_share_classes(self, cap_series):
+        for additional_share_class, main_share_class in self.additional_share_classes.items():
+            cap_series.loc[main_share_class] += cap_series.loc[additional_share_class]
+            cap_series.drop(additional_share_class, inplace=True)
+
+    def get_top_n_capitalization_companies_for_day(self, n, dt=None, merge_additional_share_classes=True):
         """
         Calculates the top-n capitalization companies for the market.
 
         :param n: the number of maximum capitalization companies to return
         :param dt: (string, int, date, datetime, Timestamp) – the date for which to return the top-n capitalization,
                    if None, the most recent business day is used
+        :param merge_additional_share_classes: for companies that have multiple share classes listed (e.g. Google),
+                                               indicates whether to merge the capitalization of different share classes
+                                               into one
         :returns: a pd.Series object capturing the top-n capitalization companies for the market along with the
                   percentage share of their capitalization in the market. The pd.Series is indexed by the ticker
                   symbols.
@@ -270,17 +286,27 @@ class Metrics:
         while np.isnan(self.capitalization.loc[dt, self.CAPITALIZATION]):
             idx -= 1
             dt = self.data.index[idx]
-        topn = self.capitalization.loc[dt, self.capitalization.columns[2:]].nlargest(n).to_frame(self.CAPITALIZATION)
+
+        cap_series = self.capitalization.loc[dt, self.capitalization.columns[2:]]
+        if merge_additional_share_classes and len(self.additional_share_classes) > 0:
+            cap_series = cap_series.copy()
+            self.adjust_for_additional_share_classes(cap_series)
+
+        topn = cap_series.nlargest(n).to_frame(self.CAPITALIZATION)
         topn[self.MKT_SHARE] = topn.iloc[:, 0] / self.capitalization.loc[dt, self.CAPITALIZATION]
+
         return topn
 
-    def get_top_n_capitalization_companies_for_month(self, n, dt=None):
+    def get_top_n_capitalization_companies_for_month(self, n, dt=None, merge_additional_share_classes=True):
         """
         Calculates the top-n capitalization companies for the market.
 
         :param n: the number of maximum capitalization companies to return
         :param dt: (string, int, date, datetime, Timestamp) – the date for whose month to return the topn capitalization
                     if None, the most recent business day is used
+        :param merge_additional_share_classes: for companies that have multiple share classes listed (e.g. Google),
+                                               indicates whether to merge the capitalization of different share classes
+                                               into one
         :returns: a pd.Series object capturing the top-n capitalization companies for the market along with the
                   percentage share of their capitalization in the market. The pd.Series is indexed by the ticker
                   symbols.
@@ -290,17 +316,23 @@ class Metrics:
         dt = MonthBegin(0).rollback(dt) if MonthBegin(0).rollback(dt) <= self.data.index[-1]\
             else MonthBegin(0).rollback(self.data.index[-1])
         resampled_cap = self.capitalization.resample('MS').mean()
-        topn = resampled_cap.loc[dt, resampled_cap.columns[2:]].nlargest(n).to_frame(self.CAPITALIZATION)
+        cap_series = resampled_cap.loc[dt, resampled_cap.columns[2:]]
+        if merge_additional_share_classes and len(self.additional_share_classes) > 0:
+            self.adjust_for_additional_share_classes(cap_series)
+        topn = cap_series.nlargest(n).to_frame(self.CAPITALIZATION)
         topn[self.MKT_SHARE] = topn.iloc[:, 0] / resampled_cap.loc[dt, self.CAPITALIZATION]
         return topn
 
-    def get_top_n_capitalization_companies_for_year(self, n, dt=None):
+    def get_top_n_capitalization_companies_for_year(self, n, dt=None, merge_additional_share_classes=True):
         """
         Calculates the top-n capitalization companies for the market.
 
         :param n: the number of maximum capitalization companies to return
         :param dt: (string, int, date, datetime, Timestamp) – the date for whose year to return the topn capitalization
                     if None, the current year is used
+        :param merge_additional_share_classes: for companies that have multiple share classes listed (e.g. Google),
+                                               indicates whether to merge the capitalization of different share classes
+                                               into one
         :returns: a pd.Series object capturing the top-n capitalization companies for the market along with the
                   percentage share of their capitalization in the market. The pd.Series is indexed by the ticker
                   symbols.
@@ -310,7 +342,10 @@ class Metrics:
         dt = YearBegin(0).rollback(dt) if YearBegin(0).rollback(dt) <= self.data.index[-1]\
             else YearBegin(0).rollback(self.data.index[-1])
         resampled_cap = self.capitalization.resample('AS').mean()
-        topn = resampled_cap.loc[dt, resampled_cap.columns[2:]].nlargest(n).to_frame(self.CAPITALIZATION)
+        cap_series = resampled_cap.loc[dt, resampled_cap.columns[2:]]
+        if merge_additional_share_classes and len(self.additional_share_classes) > 0:
+            self.adjust_for_additional_share_classes(cap_series)
+        topn = cap_series.nlargest(n).to_frame(self.CAPITALIZATION)
         topn[self.MKT_SHARE] = topn.iloc[:, 0] / resampled_cap.loc[dt, self.CAPITALIZATION]
         return topn
 
@@ -513,7 +548,7 @@ class Metrics:
 
     
 class USStockMarketMetrics(Metrics):
-    def __init__(self, tickers, stock_index='^GSPC', start=None, hist_shares_outs=None):
+    def __init__(self, tickers, additional_share_classes=None, stock_index='^GSPC', start=None, hist_shares_outs=None):
         """
         Constructs a Metrics object out of a list of ticker symbols and an optional index ticker
 
@@ -522,6 +557,9 @@ class USStockMarketMetrics(Metrics):
                         the stock represented by the ticker being added or removed. An end value of None implies it's
                         still part of the market, a start value of None designates it becoming part of the market
                         before 'start'
+        :param additional_share_classes: a dictionary whose keys are additional share classes of companies
+                                         that have multiple share classes and where they all are part of the market,
+                                         the values are the first share class (typically class A)
         :param stock_index: an optional ticker symbol of the index that corresponds to the market represented
                             by the 'tickers' parameter
         :param start: (string, int, date, datetime, Timestamp) – Starting date. Parses many kinds of date
@@ -531,14 +569,12 @@ class USStockMarketMetrics(Metrics):
                             Each key represents a ticker symbol. Each value is a panda Series designating shares
                             outstanding on certain days.
         """
-        # Unfortunately Yahoo-Finance reports incorrect closing prices for Alphabet shares before its stock split
-        super().__init__(tickers, stock_index, start, hist_shares_outs, ['GOOG', 'GOOGL', 'AMZN', 'AAPL', 'NDAQ', 'AIV',
-                                                                         'ANET', 'TECH', 'COO', 'NVDA', 'TSLA', 'CPRT',
-                                                                         'CSGP', 'CSX', 'DXCM', 'EW', 'FTNT', 'ISRG',
-                                                                         'MNST', 'NEE', 'PANW', 'SHW', 'WMT', 'GE',
-                                                                         'ODFL', 'MCHP', 'APH', 'DTE', 'FTV', 'MTCH',
-                                                                         'MKC', 'MRK', 'PFE', 'RJF', 'RTX', 'ROL',
-                                                                         'TT', 'SLG', 'FTI', 'NVDA'])
+        # Unfortunately Yahoo-Finance reports incorrect closing prices for shares before they had a stock split
+        super().__init__(tickers, additional_share_classes, stock_index, start, hist_shares_outs,
+                         ['GOOG', 'GOOGL', 'AMZN', 'AAPL', 'NDAQ', 'AIV', 'ANET', 'TECH', 'COO', 'NVDA', 'TSLA', 'CPRT',
+                          'CSGP', 'CSX', 'DXCM', 'EW', 'FTNT', 'ISRG', 'MNST', 'NEE', 'PANW', 'SHW', 'WMT', 'GE',
+                          'ODFL', 'MCHP', 'APH', 'DTE', 'FTV', 'MTCH', 'MKC', 'MRK', 'PFE', 'RJF', 'RTX', 'ROL', 'TT',
+                          'SLG', 'FTI', 'NVDA'])
 
         # Using Market Yield on U.S. Treasury Securities at 1-Year Constant Maturity, as proxy for riskless rate
         # Handy to get earlier data for more accurate estimates of volatility
@@ -550,14 +586,27 @@ class USStockMarketMetrics(Metrics):
     @staticmethod
     def get_sp500_components():
         """
-        Returns the current constituent components of the S&P 500 Stock Index. Given that three corporations in
-        the index have class B shares, the method returns 503 ticker symbols
+        Returns a pair whose first component is a list capturing the current constituent components of
+        the S&P 500 Stock Index and whose second component is a list of ticker symbols representing additional
+        share classes (three corporations in the index have class B or class C shares).
         """
         table = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
         df = table[0]
         # Correction for Yahoo-Finance's representation of Class B shares
         sp500_components = [ticker.replace('.', '-') for ticker in df['Symbol'].to_list()]
-        return sp500_components
+        # additional_share_classes = df.loc[df.loc[:, 'CIK'].duplicated(), 'Symbol'].to_list()
+        dict = df.loc[df.loc[:, 'CIK'].duplicated(keep=False), ['Symbol', 'CIK']].groupby('CIK')\
+                ['Symbol'].apply(list).to_dict()
+        additional_share_classes = {}
+        for cik, share_classes in dict.items():
+            # The list of share_classes is guaranteed to have more than one value
+            main_share_class = share_classes[0]
+            for additional_share_class in share_classes[1:]:
+                additional_share_classes[additional_share_class] = main_share_class
+        # additional_share_classes
+        # {'NWSA': 'NWS', 'GOOGL':'GOOG', 'FOXA': 'FOX'}
+
+        return sp500_components, additional_share_classes
 
     @staticmethod
     def get_sp500_historical_components(start=None):
@@ -573,7 +622,7 @@ class USStockMarketMetrics(Metrics):
         if type(start) is date:
             start = datetime.combine(start, time())
         start = pd.to_datetime(start)
-        all_components = USStockMarketMetrics.get_sp500_components().copy()
+        all_components = USStockMarketMetrics.get_sp500_components()[0].copy()
         ret = {ticker: (start, None) for ticker in all_components}
         removed_tickers = set()
 
