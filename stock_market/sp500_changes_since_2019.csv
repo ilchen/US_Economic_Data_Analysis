@@ -1,4 +1,4 @@
-date,add,remove
+`date,add,remove
 2019-01-18,"TFX","PCG"
 2019-02-15,"ATO","NFX"
 2019-02-27,"WAB","GT"
@@ -67,3 +67,4 @@ date,add,remove
 2024-04-02,"GEV",
 2024-04-03,,"XRAY,VFC"
 2024-05-08,"VST","PXD"
+2024-06-24,"GDDY,CRWD,KKR","ILMN,CMA,RHI"
