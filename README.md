@@ -24,7 +24,7 @@ In case you opt for a local installation, the rest of the dependencies can be in
 ```commandline
 python3 -m pip install -r requirements.txt
 ```
-**NB**: I use Yahoo-Finance data in the `Current_Riskfree_Rates.ipynb` notebook. Unfortunately Yahoo recently changed their API, as a result the last official version of pandas-datareader fails when retrieving data from Yahoo-Finance. To overcome it, until a new version of pandas-datareader addresses this, I added a dependency on yfinance and adjusted the notebook to make a `yfin.pdr_override()` call in each notebook that requires data from Yahoo-Finance.
+**NB**: I use Yahoo-Finance data in the `Current_Riskfree_Rates.ipynb` notebook. I switched fully to [yfinance](https://pypi.org/project/yfinance/) for working with Yahoo-Finance data due to its better maintenance and frequent new releases.
 
 ## How to run locally
 If you want to run the notebooks locally on your laptop, clone the repo and `cd` into its directory, e.g.:
