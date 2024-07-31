@@ -546,7 +546,22 @@ class Metrics:
         """
         return self.get_excess_return_helper(years, frequency, True)
 
-    
+    def get_roe_and_pb(self, tickers):
+        """
+        Constructs a DataFrame indexed by 'tickers' and whose columns represent the current ROE (TTM) and Price to Book
+        of the corresponding tickers.
+
+        :returns: a pd.DataFrame object capturing the Sharpe ratio the ROE and Price to Book ratio for each index, it
+                  may contain NaN values in case Yahoo-Finance didn't have the data
+        """
+        ret = pd.DataFrame(index=tickers, columns=['ROE', 'P/B'])
+        for ticker in tickers:
+            if all(k in self.tickers.tickers[ticker].info for k in ('returnOnEquity', 'priceToBook')):
+                ret.loc[ticker, 'ROE'] = self.tickers.tickers[ticker].info['returnOnEquity']
+                ret.loc[ticker, 'P/B'] = self.tickers.tickers[ticker].info['priceToBook']
+        return ret
+
+
 class USStockMarketMetrics(Metrics):
     def __init__(self, tickers, additional_share_classes=None, stock_index='^GSPC', start=None, hist_shares_outs=None):
         """
@@ -587,8 +602,9 @@ class USStockMarketMetrics(Metrics):
     def get_sp500_components():
         """
         Returns a pair whose first component is a list capturing the current constituent components of
-        the S&P 500 Stock Index and whose second component is a list of ticker symbols representing additional
-        share classes (three corporations in the index have class B or class C shares).
+        the S&P 500 Stock Index and whose second component is a dictionary of companies in S&P500 that have multiple
+        share classes as part of the index, the keys are additional shares tickers ticker symbols and values
+        are the first share class (typically class A). Three corporations in the index have class B or class C shares.
         """
         table = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
         df = table[0]
@@ -604,9 +620,22 @@ class USStockMarketMetrics(Metrics):
             for additional_share_class in share_classes[1:]:
                 additional_share_classes[additional_share_class] = main_share_class
         # additional_share_classes
-        # {'NWSA': 'NWS', 'GOOGL':'GOOG', 'FOXA': 'FOX'}
+        # {'NWS': 'NWSA', 'GOOG': 'GOOGL', 'FOX': 'FOXA'}
 
         return sp500_components, additional_share_classes
+
+    @staticmethod
+    def get_sp500_banking_sector_components():
+        """
+        Returns a pair whose first component is a list capturing the current constituent components of
+        the S&P 500 Stock Index and whose second component is a list of ticker symbols representing additional
+        share classes (three corporations in the index have class B or class C shares).
+        """
+        table = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
+        df = table[0]
+        # Correction for Yahoo-Finance's representation of Class B shares
+        cps = df.loc[(df['GICS Sector'] == 'Financials') & (df['GICS Sub-Industry'].str.find('Banks') != -1), 'Symbol']
+        return [ticker.replace('.', '-') for ticker in cps.to_list()]
 
     @staticmethod
     def get_sp500_historical_components(start=None):
