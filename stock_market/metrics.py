@@ -627,9 +627,7 @@ class USStockMarketMetrics(Metrics):
     @staticmethod
     def get_sp500_banking_sector_components():
         """
-        Returns a pair whose first component is a list capturing the current constituent components of
-        the S&P 500 Stock Index and whose second component is a list of ticker symbols representing additional
-        share classes (three corporations in the index have class B or class C shares).
+        Returns a list of ticker symbols of S&P 500 Stock Index companies that belong to the banking sector.
         """
         table = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
         df = table[0]
