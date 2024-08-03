@@ -27,7 +27,7 @@ class Metrics:
     TO_ANNUAL_MULTIPLIER = sqrt(TRADING_DAYS_IN_YEAR)
 
     def __init__(self, tickers, additional_share_classes=None, stock_index=None, start=None, hist_shares_outs=None,
-                 tickers_to_correct_for_splits=None):
+                 tickers_to_correct_for_splits=None, currency_conversion_df=None):
         """
         Constructs a Metrics object out of a list of ticker symbols and an optional index ticker
 
@@ -50,6 +50,9 @@ class Metrics:
         :param tickers_to_correct_for_splits: Yahoo-Finance sometimes incorrectly reports close price by automatically
                                               adjusting it for splits, this list contains ticker symbols for which
                                               a correction is required.
+        :param currency_conversion_df: for heterogeneous markets made up of stocks priced in different currencies,
+                                       a DataFrame whose columns are suffixes such as '.L', '.SW', '.CO', etc and whose
+                                       rows are the corresponding conversion rates.
         """
         self.ticker_symbols = tickers
         self.tickers = yfin.Tickers(list(self.ticker_symbols.keys()))
@@ -69,6 +72,18 @@ class Metrics:
             info = self.tickers.tickers[ticker].info
             dividend_yield = info.get('dividendYield')
             pe = info.get('forwardPE')
+
+            # A kludge for London Stock Exchange, Yahoo-Finance sometimes reports incorrect forwardPEs
+            comps = ticker.split('.')
+            sfx = '.' + comps[-1]
+            if len(comps) > 1 and sfx == '.L':
+                trailing_pe = info.get('trailingPE')
+                if trailing_pe is not None and trailing_pe / pe < .05:
+                    trailing_eps = info.get('trailingEps')
+                    eps = info.get('forwardEps')
+                    if trailing_eps is not None and eps is not None:
+                        pe = trailing_pe * trailing_eps / eps
+
             self.dividend_yield[ticker] = 0. if dividend_yield is None else dividend_yield
             self.pe[ticker] = 0. if pe is None else pe
 
@@ -135,6 +150,14 @@ class Metrics:
                 print(f'Adjusting closing prices before the split date on {split_date:%Y-%m-%d} for {ticker}')
                 self.data.loc[self.data.index[0]:split_date-BDay(1), ([self.CLOSE, self.VOLUME], ticker)]\
                     = f.loc[self.data.index[0]:split_date-BDay(1)]
+
+        # Currency conversion
+        if currency_conversion_df is not None:
+            for ticker in self.ticker_symbols.keys():
+                comps = ticker.split('.')
+                sfx = '.' + comps[-1]
+                if len(comps) > 1 and sfx in currency_conversion_df.columns:
+                    self.data.loc[:, (self.CLOSE, ticker)] *= currency_conversion_df.loc[self.data.index, sfx]
 
         self.shares_outstanding = {}
         for ticker in self.ticker_symbols.keys():
@@ -299,7 +322,7 @@ class Metrics:
 
     def get_top_n_capitalization_companies_for_month(self, n, dt=None, merge_additional_share_classes=True):
         """
-        Calculates the top-n capitalization companies for the market.
+        Calculates the top-n capitalization companies for the market taking the average for the month specified.
 
         :param n: the number of maximum capitalization companies to return
         :param dt: (string, int, date, datetime, Timestamp) – the date for whose month to return the topn capitalization
@@ -325,7 +348,7 @@ class Metrics:
 
     def get_top_n_capitalization_companies_for_year(self, n, dt=None, merge_additional_share_classes=True):
         """
-        Calculates the top-n capitalization companies for the market.
+        Calculates the top-n capitalization companies for the market taking the average for the year specified.
 
         :param n: the number of maximum capitalization companies to return
         :param dt: (string, int, date, datetime, Timestamp) – the date for whose year to return the topn capitalization
@@ -559,6 +582,8 @@ class Metrics:
             if all(k in self.tickers.tickers[ticker].info for k in ('returnOnEquity', 'priceToBook')):
                 ret.loc[ticker, 'ROE'] = self.tickers.tickers[ticker].info['returnOnEquity']
                 ret.loc[ticker, 'P/B'] = self.tickers.tickers[ticker].info['priceToBook']
+                if ticker.endswith('.L'):
+                    ret.loc[ticker, 'P/B'] /= 100.
         return ret
 
 
@@ -681,7 +706,13 @@ class USStockMarketMetrics(Metrics):
         respective companies.
         """
         last_bd = BDay(0).rollback
-        return {'AGN': pd.Series([329002015, 329805791],
+        return {'ABMD': pd.Series([45062665, 44956959, 45047262, 45189883, 45230966, 45295979, 45380233, 45497490,
+                                   45516200, 45563937, 45460884, 45091184],
+                                  index=pd.DatetimeIndex(['2020-01-30', '2020-05-14', '2020-07-30', '2020-10-22',
+                                                          '2021-01-25', '2021-05-14', '2021-07-30', '2021-10-21',
+                                                          '2022-01-27', '2022-05-13', '2022-07-29', '2022-10-28'])
+                                  .map(last_bd)),
+                'AGN': pd.Series([329002015, 329805791],
                                  index=pd.DatetimeIndex(['2020-02-12', '2020-05-01']).map(last_bd)),
                 'ALXN': pd.Series([221400872, 220827431, 218845432, 219847960, 221019230],
                                   index=pd.DatetimeIndex(['2020-01-29', '2020-05-04', '2020-10-27', '2021-02-12',
@@ -797,3 +828,71 @@ class USStockMarketMetrics(Metrics):
                                   index=pd.DatetimeIndex(['2020-01-10', '2020-04-24', '2020-07-10', '2020-10-09',
                                                           '2021-01-15', '2021-04-30', '2021-07-16', '2021-10-15',
                                                           '2022-01-14']).map(last_bd))}
+
+
+class EuropeBanksStockMarketMetrics(Metrics):
+    def __init__(self, tickers, additional_share_classes=None, stock_index=None, start=None, hist_shares_outs=None,
+                 currency_conversion_df=None):
+        """
+        Constructs a Metrics object out of a list of ticker symbols and an optional index ticker
+
+        :param tickers: a dictionary representing all the ticker symbols making up a stock market that this class
+                        derives metrics for. Each key represents a ticker symbol, each value the start and end day of
+                        the stock represented by the ticker being added or removed. An end value of None implies it's
+                        still part of the market, a start value of None designates it becoming part of the market
+                        before 'start'
+        :param additional_share_classes: a dictionary whose keys are additional share classes of companies
+                                         that have multiple share classes and where they all are part of the market,
+                                         the values are the first share class (typically class A)
+        :param stock_index: an optional ticker symbol of the index that corresponds to the market represented
+                            by the 'tickers' parameter
+        :param start: (string, int, date, datetime, Timestamp) – Starting date. Parses many kinds of date
+                       representations (e.g., ‘JAN-01-2010’, ‘1/1/10’, ‘Jan, 1, 1980’). Defaults to 5 years before
+                       current date.
+        :param hist_shares_outs: a dictionary representing historical shares outstanding for delisted tickers.
+                            Each key represents a ticker symbol. Each value is a panda Series designating shares
+                            outstanding on certain days.
+        :param currency_conversion_df: for heterogeneous markets made up of stocks priced in different currencies,
+                               a DataFrame whose columns are suffixes such as '.L', '.SW', '.CO', etc and whose
+                               rows are the corresponding conversion rates.
+        """
+        # Unfortunately Yahoo-Finance reports incorrect closing prices for shares before they had a stock split
+        super().__init__(tickers, additional_share_classes, stock_index, start, hist_shares_outs,
+                         None, currency_conversion_df)
+
+        import eurostat
+        # Using 1-Year spot rate of Eurozone AAA-rated government bonds as proxy for riskless rate
+        euro_curves = eurostat.get_data_df('irt_euryld_d', filter_pars={
+            'startPeriod': (start - pd.DateOffset(months=1)).date(), 'freq': 'D',
+            'yld_curv': 'SPOT_RT',
+            'maturity': 'Y1',
+            'bonds': 'CGB_EA_AAA', 'geo': 'EA'})
+        euro_curves = euro_curves.drop(euro_curves.columns[:2].append(euro_curves.columns[3:5]), axis=1)
+        euro_curves = euro_curves.set_index(euro_curves.columns[0]).T / 100.
+        euro_curves = euro_curves.set_axis(pd.DatetimeIndex(euro_curves.index))
+
+        # Convert from continuous to annual compounding
+        self.riskless_rate = np.exp(euro_curves.Y1.astype('float64')) - 1.
+
+    @staticmethod
+    def get_stoxx_europe_banks_components():
+        """
+        Returns a list of ticker symbols of Stoxx Europe 600 Banks Index.
+        """
+        return ['INGA.AS', 'ABN.AS', 'DBK.DE', 'CBK.DE', 'BNP.PA', 'ACA.PA', 'GLE.PA', 'KBC.BR', 'BIRG.IR',
+                'BBVA.MC', 'BKT.MC', 'CABK.MC', 'SAB.MC', 'SAN.MC', 'EBS.VI', 'RBI.VI',
+                'ISP.MI', 'UCG.MI', 'MB.MI', 'BAMI.MI', 'BPE.MI',
+                'HSBA.L', 'BARC.L', 'LLOY.L', 'NWG.L', 'VMUK.L', 'STAN.L',
+                'BAER.SW', 'UBSG.SW', 'CMBN.SW',
+                'NDA-SE.ST', 'SEB-A.ST', 'SWED-A.ST', 'SHB-A.ST',
+                'DANSKE.CO', 'SYDB.CO', 'JYSK.CO',
+                'DNB.OL',
+                'KOMB.PR']
+
+    @staticmethod
+    def tickers_to_dict(tickers, st):
+        """
+        Converts a list of ticker symbols into a dictionary whose keys are the same ticker symbols and whose values
+        are (start-date, end-date) pairs indicating since when a particular ticker has been part of the market
+        """
+        return {ticker: (st, None) for ticker in tickers}
