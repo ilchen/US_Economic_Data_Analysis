@@ -128,28 +128,7 @@ class Metrics:
                 f = f.loc[self.data.index[0]:, ['close', 'volume']]
                 f.columns = pd.MultiIndex.from_tuples(list(zip([self.CLOSE, self.VOLUME], [ticker]*2)))
 
-                split_date = None
-                # Detecting many for one stock conversions
-                pct_change = f.loc[:, (self.CLOSE, ticker)].pct_change()
-                k = pct_change.loc[pct_change >= 0.95]
-                if len(k) > 0:
-                    split_date = k.index[0]
-
-                splits = self.tickers.tickers[ticker].splits
-                if splits is not None and len(splits) > 0 and (split_date is None or
-                                                               splits.index[-1].tz_localize(None) > split_date):
-                    split_date = splits.index[-1].tz_localize(None)
-
-                # Unfortunately Yahoo-Finance API occasionally fails to report the most recent splits
-                # Detecting one for many stock splits
-                pct_change = f.loc[:, (self.CLOSE, ticker)].iloc[::-1].pct_change()
-                k = pct_change.loc[pct_change >= 0.95]
-                if len(k) > 0 and (split_date is None or k.index[0] > split_date):
-                    split_date = k.index[0] + BDay(1)
-
-                print(f'Adjusting closing prices before the split date on {split_date:%Y-%m-%d} for {ticker}')
-                self.data.loc[self.data.index[0]:split_date-BDay(1), ([self.CLOSE, self.VOLUME], ticker)]\
-                    = f.loc[self.data.index[0]:split_date-BDay(1)]
+                self.data.loc[self.data.index[0]:f.index[-1], ([self.CLOSE, self.VOLUME], ticker)] = f
 
         # Currency conversion
         if currency_conversion_df is not None:
@@ -614,7 +593,7 @@ class USStockMarketMetrics(Metrics):
                          ['GOOG', 'GOOGL', 'AMZN', 'AAPL', 'NDAQ', 'AIV', 'ANET', 'TECH', 'COO', 'NVDA', 'TSLA', 'CPRT',
                           'CSGP', 'CSX', 'DXCM', 'EW', 'FTNT', 'ISRG', 'MNST', 'NEE', 'PANW', 'SHW', 'WMT', 'GE',
                           'ODFL', 'MCHP', 'APH', 'DTE', 'FTV', 'MTCH', 'MKC', 'MRK', 'PFE', 'RJF', 'RTX', 'ROL', 'TT',
-                          'SLG', 'FTI', 'NVDA'])
+                          'SLG', 'FTI', 'NVDA', 'CMG', 'AVGO', 'WRB'])
 
         # Using Market Yield on U.S. Treasury Securities at 1-Year Constant Maturity, as proxy for riskless rate
         # Handy to get earlier data for more accurate estimates of volatility
