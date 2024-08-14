@@ -591,9 +591,10 @@ class USStockMarketMetrics(Metrics):
         # Unfortunately Yahoo-Finance reports incorrect closing prices for shares before they had a stock split
         super().__init__(tickers, additional_share_classes, stock_index, start, hist_shares_outs,
                          ['GOOG', 'GOOGL', 'AMZN', 'AAPL', 'NDAQ', 'AIV', 'ANET', 'TECH', 'COO', 'NVDA', 'TSLA', 'CPRT',
-                          'CSGP', 'CSX', 'DXCM', 'EW', 'FTNT', 'ISRG', 'MNST', 'NEE', 'PANW', 'SHW', 'WMT', 'GE',
+                          'CSGP', 'CSX', 'DXCM', 'EW', 'FTNT', 'ISRG', 'MNST', 'NEE', 'PANW', 'SHW', 'WMT', 'GE', 'LH',
                           'ODFL', 'MCHP', 'APH', 'DTE', 'FTV', 'MTCH', 'MKC', 'MRK', 'PFE', 'RJF', 'RTX', 'ROL', 'TT',
-                          'SLG', 'FTI', 'NVDA', 'CMG', 'AVGO', 'WRB'])
+                          'SLG', 'FTI', 'NVDA', 'CMG', 'AVGO', 'WRB', 'EXC', 'BWA', 'K', 'IP', 'O', 'PCAR', 'DHR',
+                          'BBWI', 'BDX', 'ZBH', 'SRE', 'MMM', 'IBM'])
 
         # Using Market Yield on U.S. Treasury Securities at 1-Year Constant Maturity, as proxy for riskless rate
         # Handy to get earlier data for more accurate estimates of volatility
