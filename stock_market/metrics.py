@@ -87,6 +87,9 @@ class Metrics:
             self.dividend_yield[ticker] = 0. if dividend_yield is None else dividend_yield
             self.pe[ticker] = 0. if pe is None else pe
 
+        # Inplace setting is perfectly fine
+        warnings.filterwarnings('ignore', message='In a future version, `df.+` will attempt to set the values inplace',
+                                category=FutureWarning)
         subset = self.data.loc[:, (self.CLOSE,)]
         delisted_tickers = subset.columns[subset.isna().all()]
         for delisted_ticker in delisted_tickers:
@@ -95,6 +98,7 @@ class Metrics:
             else:
                 # Filling in the gaps with Alpha Vantage API for close prices and volumes of delisted shares
                 # Please request your own API Key in order to make the below call work
+                print(f'About to download historical daily closing prices for {delisted_ticker}')
                 f = web.DataReader(delisted_ticker, 'av-daily', start=start, api_key=os.getenv('ALPHAVANTAGE_API_KEY'))
                 f.to_csv(f'./stock_market/historical_equity_data/{delisted_ticker}.cvs')
 
@@ -194,7 +198,7 @@ class Metrics:
             # Getting rid of extraneous dates
             self.shares_outstanding[ticker] = shares_outst.loc[self.data.index]
 
-        warnings.filterwarnings('ignore', message='DataFrame is highly fragmented*',
+        warnings.filterwarnings('ignore', message='DataFrame is highly fragmented',
                                 category=pd.errors.PerformanceWarning)
         self.capitalization = pd.DataFrame(0., index=self.data.index,
                                            columns=[Metrics.CAPITALIZATION, Metrics.TURNOVER])
@@ -589,12 +593,14 @@ class USStockMarketMetrics(Metrics):
                             outstanding on certain days.
         """
         # Unfortunately Yahoo-Finance reports incorrect closing prices for shares before they had a stock split
+        # or an implicit stock split when a firm spins off one of its units into an independent entity, e.g. recent
+        # IBM and T splits.
         super().__init__(tickers, additional_share_classes, stock_index, start, hist_shares_outs,
                          ['GOOG', 'GOOGL', 'AMZN', 'AAPL', 'NDAQ', 'AIV', 'ANET', 'TECH', 'COO', 'NVDA', 'TSLA', 'CPRT',
                           'CSGP', 'CSX', 'DXCM', 'EW', 'FTNT', 'ISRG', 'MNST', 'NEE', 'PANW', 'SHW', 'WMT', 'GE', 'LH',
                           'ODFL', 'MCHP', 'APH', 'DTE', 'FTV', 'MTCH', 'MKC', 'MRK', 'PFE', 'RJF', 'RTX', 'ROL', 'TT',
                           'SLG', 'FTI', 'NVDA', 'CMG', 'AVGO', 'WRB', 'EXC', 'BWA', 'K', 'IP', 'O', 'PCAR', 'DHR',
-                          'BBWI', 'BDX', 'ZBH', 'SRE', 'MMM', 'IBM'])
+                          'BBWI', 'BDX', 'ZBH', 'SRE', 'MMM', 'IBM', 'T'])
 
         # Using Market Yield on U.S. Treasury Securities at 1-Year Constant Maturity, as proxy for riskless rate
         # Handy to get earlier data for more accurate estimates of volatility
@@ -778,6 +784,9 @@ class USStockMarketMetrics(Metrics):
                                                          '2024-02-20', '2024-05-01']).map(last_bd)),
                 'RTN': pd.Series([278479000, 278441000],
                                  index=pd.DatetimeIndex(['2019-10-21', '2020-02-10']).map(last_bd)),
+                'SBNY': pd.Series([60632000, 63065000, 62929000, 62927000, 62929000, 62250000],
+                                  index=pd.DatetimeIndex(['2021-11-15', '2022-02-15', '2022-05-15', '2022-08-15',
+                                                          '2022-11-15', '2023-01-31']).map(last_bd)),
                 'SIVB': pd.Series([51513227, 51796902, 54315140, 56436504, 58687392, 58802627, 58851167, 59082305,
                                    59104124, 59200925],
                                   index=pd.DatetimeIndex(['2020-04-30', '2020-10-31', '2021-04-30', '2021-07-31',
