@@ -42,7 +42,7 @@ class EuroCurrencyConverter:
         # Ensure coverage for all days
         missing_days = pd.DataFrame(
             index=pd.date_range(start, self.cur_conv_df.index[-1], freq='D').difference(self.cur_conv_df.index),
-            columns=self.cur_conv_df.columns)
+            columns=self.cur_conv_df.columns, dtype='float64')
         self.cur_conv_df = pd.concat([self.cur_conv_df, missing_days]).sort_index().ffill()
 
         # London stock exchange quotes in pences

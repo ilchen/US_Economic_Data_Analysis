@@ -246,7 +246,7 @@ class Metrics:
             additional_share_classes = {}
         self.additional_share_classes = additional_share_classes
 
-    def get_capitalization(self, frequency='M', tickers=None):
+    def get_capitalization(self, frequency='ME', tickers=None):
         """
         Calculates the capitalization of a given market or a subset of stocks over time. Downsamples if a less
         granular frequency than daily is specified. Takes an average capitalization over periods implied by
@@ -347,7 +347,7 @@ class Metrics:
             dt = self.data.index[-1]
         dt = YearBegin(0).rollback(dt) if YearBegin(0).rollback(dt) <= self.data.index[-1]\
             else YearBegin(0).rollback(self.data.index[-1])
-        resampled_cap = self.capitalization.resample('AS').mean()
+        resampled_cap = self.capitalization.resample('YS').mean()
         cap_series = resampled_cap.loc[dt, resampled_cap.columns[2:]]
         if merge_additional_share_classes and len(self.additional_share_classes) > 0:
             self.adjust_for_additional_share_classes(cap_series)
@@ -366,7 +366,7 @@ class Metrics:
                     * self.data.loc[st:ed, (Metrics.VOLUME, ticker)]
         return daily_turnover
 
-    def get_daily_trading_value(self, frequency='M', tickers=None):
+    def get_daily_trading_value(self, frequency='ME', tickers=None):
         """
         Calculates a total daily trading value of stocks in the market implied by this object.
         Downsamples if a less granular frequency than daily is specified. Takes an average turnover over periods
@@ -379,10 +379,10 @@ class Metrics:
         """
         return self.get_daily_trading_value_ds(tickers).resample(frequency).mean().dropna().rename(self.TOTAL_VALUE)
 
-    def get_annual_trading_value(self, frequency='M', tickers=None):
+    def get_annual_trading_value(self, frequency='ME', tickers=None):
         return self.get_daily_trading_value(frequency, tickers) * self.TRADING_DAYS_IN_YEAR
 
-    def get_daily_turnover(self, frequency='M', tickers=None):
+    def get_daily_turnover(self, frequency='ME', tickers=None):
         """
         Calculates a daily turnover ratio of stocks in the market implied by this object to its capitalization.
         Downsamples if a less granular frequency than daily is specified. Takes an average turnover over periods
@@ -406,7 +406,7 @@ class Metrics:
 
         return daily_turnover.resample(frequency).mean().dropna()
 
-    def get_annual_turnover(self, frequency='M', tickers=None):
+    def get_annual_turnover(self, frequency='ME', tickers=None):
         """
         Calculates an annual turnover ratio of stocks in the market implied by this object to its capitalization.
         Downsamples if a less granular frequency than daily is specified. Takes an average turnover over periods
@@ -419,7 +419,7 @@ class Metrics:
         """
         return self.get_daily_turnover(frequency, tickers) * self.TRADING_DAYS_IN_YEAR
 
-    def get_annual_volatility(self, alpha=1-.94453, frequency='M'):
+    def get_annual_volatility(self, alpha=1-.94453, frequency='ME'):
         """
         Calculates an annual volatility of a market represented by the stock market index used when constructing
         this instance of Metrics. It uses an exponentially weighted moving average (EWMA) with a given smoothing factor
@@ -498,7 +498,7 @@ class Metrics:
         market = market.loc[common_index[0]:]
         return market.cov(portfolio) / market.var()
     
-    def get_excess_return_helper(self, years=2, frequency='M', sharpe_ratio=False):
+    def get_excess_return_helper(self, years=2, frequency='ME', sharpe_ratio=False):
         """
         Calculates either an excess return of the marker over the riskless rate or ex-post Sharpe ratio
         of the market represented by this object.
@@ -507,14 +507,14 @@ class Metrics:
                       that this object represents
         :param frequency: a standard Pandas frequency designator
             https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#timeseries-offset-aliases must
-            be limited to M, BM, MS, or BMS.
+            be limited to ME, BME, MS, or BMS.
         :param sharpe_ratio: a boolean indicating what to return: if False calculate excess returns, if True the
                              Sharpe ratio
         :returns: a pd.Series object capturing the Sharpe ratio of the market represented by this object
         """
         if self.stock_index_data is None or self.riskless_rate is None:
             return None
-        if frequency not in ['M', 'BM', 'MS', 'BMS']:
+        if frequency not in ['ME', 'BME', 'MS', 'BMS']:
             raise ValueError(f'Frequency {frequency} is not supported')
         if frequency in ['MS', 'BMS']:
             riskless_rate = self.riskless_rate.resample(frequency).first()
@@ -533,13 +533,13 @@ class Metrics:
         riskless_rate = riskless_rate.loc[st:]
         return (market - riskless_rate) / volatility if sharpe_ratio else market - riskless_rate
 
-    def get_excess_return(self, years=2, frequency='M'):
+    def get_excess_return(self, years=2, frequency='ME'):
         """
         Calculates ex-post excess annual return of the market represented by this object over 1-year riskless rate.
         """
         return self.get_excess_return_helper(years, frequency, False)
 
-    def get_sharpe_ratio(self, years=2, frequency='M'):
+    def get_sharpe_ratio(self, years=2, frequency='ME'):
         """
         Calculates ex-post Sharpe ratio of the market represented by this object.
 
@@ -669,11 +669,11 @@ class USStockMarketMetrics(Metrics):
             ts = pd.to_datetime(idx)
             if ts < start:
                 break
-            for added_ticker in [] if pd.isnull(row[0]) else row[0].split(','):
+            for added_ticker in [] if pd.isnull(row.iloc[0]) else row.iloc[0].split(','):
                 _, end = ret[added_ticker]
                 ret[added_ticker] = (ts, end)
 
-            for removed_ticker in [] if pd.isnull(row[1]) else row[1].split(','):
+            for removed_ticker in [] if pd.isnull(row.iloc[1]) else row.iloc[1].split(','):
                 ret[removed_ticker] = (start, ts-BDay(1))
                 removed_tickers.add(removed_ticker)
                 all_components.append(removed_ticker)
