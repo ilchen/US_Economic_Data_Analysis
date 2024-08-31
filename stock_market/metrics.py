@@ -74,9 +74,8 @@ class Metrics:
             pe = info.get('forwardPE')
 
             # A kludge for London Stock Exchange, Yahoo-Finance sometimes reports incorrect forwardPEs
-            comps = ticker.split('.')
-            sfx = '.' + comps[-1]
-            if len(comps) > 1 and sfx == '.L':
+            sfx = self.get_exchange_suffix(ticker)
+            if sfx == '.L':
                 trailing_pe = info.get('trailingPE')
                 if trailing_pe is not None and trailing_pe / pe < .05:
                     trailing_eps = info.get('trailingEps')
@@ -137,9 +136,8 @@ class Metrics:
         # Currency conversion
         if currency_conversion_df is not None:
             for ticker in self.ticker_symbols.keys():
-                comps = ticker.split('.')
-                sfx = '.' + comps[-1]
-                if len(comps) > 1 and sfx in currency_conversion_df.columns:
+                sfx = self.get_exchange_suffix(ticker)
+                if sfx in currency_conversion_df.columns:
                     self.data.loc[:, (self.CLOSE, ticker)] *= currency_conversion_df.loc[self.data.index, sfx]
 
         self.shares_outstanding = {}
@@ -568,6 +566,12 @@ class Metrics:
                 if ticker.endswith('.L'):
                     ret.loc[ticker, 'P/B'] /= 100.
         return ret
+
+    @staticmethod
+    def get_exchange_suffix(ticker):
+        comps = ticker.split('.')
+        sfx = '.' + comps[-1]
+        return None if len(comps) == 1 else sfx
 
 
 class USStockMarketMetrics(Metrics):
