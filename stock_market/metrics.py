@@ -604,7 +604,7 @@ class USStockMarketMetrics(Metrics):
                           'CSGP', 'CSX', 'DXCM', 'EW', 'FTNT', 'ISRG', 'MNST', 'NEE', 'PANW', 'SHW', 'WMT', 'GE', 'LH',
                           'ODFL', 'MCHP', 'APH', 'DTE', 'FTV', 'MTCH', 'MKC', 'MRK', 'PFE', 'RJF', 'RTX', 'ROL', 'TT',
                           'SLG', 'FTI', 'NVDA', 'CMG', 'AVGO', 'WRB', 'EXC', 'BWA', 'K', 'IP', 'O', 'PCAR', 'DHR',
-                          'BBWI', 'BDX', 'ZBH', 'SRE', 'MMM', 'IBM', 'T'])
+                          'BBWI', 'BDX', 'ZBH', 'SRE', 'MMM', 'IBM', 'T', 'CTAS'])
 
         # Using Market Yield on U.S. Treasury Securities at 1-Year Constant Maturity, as proxy for riskless rate
         # Handy to get earlier data for more accurate estimates of volatility
@@ -814,6 +814,14 @@ class USStockMarketMetrics(Metrics):
                                                          '2021-01-29']).map(last_bd)),
                 'WCG': pd.Series([50312077, 50327612],
                                  index=pd.DatetimeIndex(['2019-07-26', '2019-10-28']).map(last_bd)),
+                'WRK': pd.Series([258456273, 259255002, 259636357, 262653756, 263516869, 266116343, 267006103,
+                                  265001543, 263214392, 254851968, 254298051, 254463987, 254651783, 256130237,
+                                  256279376, 256469100, 256966731, 258148056],
+                                 index=pd.DatetimeIndex(['2020-01-17', '2020-04-24', '2020-07-24', '2020-11-06',
+                                                         '2021-01-22', '2021-04-23', '2021-07-23', '2021-11-05',
+                                                         '2022-01-21', '2022-05-03', '2022-07-22', '2022-11-04',
+                                                         '2023-01-20', '2023-04-21', '2023-07-21', '2023-11-03',
+                                                         '2024-01-19', '2024-04-19']).map(last_bd)),
                 'XEC': pd.Series([101810140, 102135577],
                                  index=pd.DatetimeIndex(['2019-10-31', '2020-01-31']).map(last_bd)),
                 'XLNX': pd.Series([248836561, 243846000, 244314000, 245059000, 245277000, 245840000, 247468170,
