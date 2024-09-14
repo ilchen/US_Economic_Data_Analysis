@@ -51,7 +51,7 @@ class Metrics:
                                               adjusting it for splits, this list contains ticker symbols for which
                                               a correction is required.
         :param currency_conversion_df: for heterogeneous markets made up of stocks priced in different currencies,
-                                       a DataFrame whose columns are suffixes such as '.L', '.SW', '.CO', etc and whose
+                                       a DataFrame whose columns are suffixes such as '.L', '.SW', '.CO', etc. and whose
                                        rows are the corresponding conversion rates.
         """
         self.ticker_symbols = tickers
@@ -854,7 +854,7 @@ class EuropeBanksStockMarketMetrics(Metrics):
                             Each key represents a ticker symbol. Each value is a panda Series designating shares
                             outstanding on certain days.
         :param currency_conversion_df: for heterogeneous markets made up of stocks priced in different currencies,
-                               a DataFrame whose columns are suffixes such as '.L', '.SW', '.CO', etc and whose
+                               a DataFrame whose columns are suffixes such as '.L', '.SW', '.CO', etc. and whose
                                rows are the corresponding conversion rates.
         """
         # Unfortunately Yahoo-Finance reports incorrect closing prices for shares before they had a stock split
