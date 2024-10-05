@@ -61,6 +61,9 @@ class Metrics:
         self.data = self.tickers.download(start=start, auto_adjust=False, actions=False, ignore_tz=True)
         self.data = self.data.loc[:, ([Metrics.CLOSE, Metrics.VOLUME])]
 
+        # Required until the 'ignore_tz' parameter in the 'download' method starts working again
+        self.data.index = self.data.index.tz_localize(None)
+
         # In case some stocks captured in the tickers list were not trading during the date range,
         # I assume they were trading using their first price.
         self.data.bfill(inplace=True)
@@ -235,6 +238,8 @@ class Metrics:
             self.stock_index_data = yfin.download(
                 stock_index, start=start - pd.DateOffset(years=3), auto_adjust=True, actions=False, ignore_tz=True)\
                     .loc[:, Metrics.ADJ_CLOSE]
+            # Required until the 'ignore_tz' parameter in the 'download' method starts working again
+            self.stock_index_data = self.stock_index_data.tz_localize(None)
         
         # Must be initialized in a subclass
         self.riskless_rate = None
@@ -469,6 +474,8 @@ class Metrics:
             if n > 1:
                 portfolio = tickers.download(start=MonthBegin(0).rollback(self.data.index[0]),
                                              auto_adjust=True, actions=False, ignore_tz=True)
+                # Required until the 'ignore_tz' parameter in the 'download' method starts working again
+                portfolio.index = portfolio.index.tz_localize(None)
             else:
                 portfolio = tickers.history(start=MonthBegin(0).rollback(self.data.index[0]),
                                             auto_adjust=True, actions=False)
@@ -604,7 +611,7 @@ class USStockMarketMetrics(Metrics):
                           'CSGP', 'CSX', 'DXCM', 'EW', 'FTNT', 'ISRG', 'MNST', 'NEE', 'PANW', 'SHW', 'WMT', 'GE', 'LH',
                           'ODFL', 'MCHP', 'APH', 'DTE', 'FTV', 'MTCH', 'MKC', 'MRK', 'PFE', 'RJF', 'RTX', 'ROL', 'TT',
                           'SLG', 'FTI', 'NVDA', 'CMG', 'AVGO', 'WRB', 'EXC', 'BWA', 'K', 'IP', 'O', 'PCAR', 'DHR',
-                          'BBWI', 'BDX', 'ZBH', 'SRE', 'MMM', 'IBM', 'T', 'CTAS', 'DECK'])
+                          'BBWI', 'BDX', 'ZBH', 'SRE', 'MMM', 'IBM', 'T', 'CTAS', 'DECK', 'SMCI', 'LRCX'])
 
         # Using Market Yield on U.S. Treasury Securities at 1-Year Constant Maturity, as proxy for riskless rate
         # Handy to get earlier data for more accurate estimates of volatility
