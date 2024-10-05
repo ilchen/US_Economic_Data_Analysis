@@ -39,13 +39,16 @@ class EuroCurrencyConverter:
         self.cur_conv_df = self.cur_conv_df.loc[:, metrics.Metrics.CLOSE]
         self.cur_conv_df.columns = [EuroCurrencyConverter.INVERSE_MAP[ticker] for ticker in self.cur_conv_df.columns]
 
+        # Required until the 'ignore_tz' parameter in the 'download' method starts working again
+        self.cur_conv_df = self.cur_conv_df.tz_localize(None)
+
         # Ensure coverage for all days
         missing_days = pd.DataFrame(
             index=pd.date_range(start, self.cur_conv_df.index[-1], freq='D').difference(self.cur_conv_df.index),
             columns=self.cur_conv_df.columns, dtype='float64')
         self.cur_conv_df = pd.concat([self.cur_conv_df, missing_days]).sort_index().ffill()
 
-        # London stock exchange quotes in pences
+        # London stock exchange quotes in pence
         if '.L' in suffixes_for_conversion:
             self.cur_conv_df.loc[:, '.L'] /= 100.
 
