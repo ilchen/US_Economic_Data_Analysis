@@ -35,7 +35,7 @@ class Metrics:
                         derives metrics for. Each key represents a ticker symbol. Each value designates the start and
                         end day of the stock represented by the ticker being added or removed. An end value of None
                         implies it's still part of the market, a start value of None designates it becoming part of
-                        the marke before 'start'
+                        the market before 'start'
         :param additional_share_classes: a dictionary whose keys are additional share classes of companies
                                          that have multiple share classes and where they all are part of the market,
                                          the values are the first share class (typically class A)
@@ -237,7 +237,9 @@ class Metrics:
             # Handy to get earlier data for the index for more accurate estimate of volatility
             self.stock_index_data = yfin.download(
                 stock_index, start=start - pd.DateOffset(years=3), auto_adjust=True, actions=False, ignore_tz=True)\
-                    .loc[:, Metrics.ADJ_CLOSE]
+                    .loc[:, (Metrics.ADJ_CLOSE, stock_index)]
+            #        .loc[:, Metrics.ADJ_CLOSE], worked in older versions of yfinance
+            
             # Required until the 'ignore_tz' parameter in the 'download' method starts working again
             self.stock_index_data = self.stock_index_data.tz_localize(None)
         
