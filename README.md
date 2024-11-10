@@ -105,6 +105,8 @@ or `https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/Quantitative_E
 or `https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/Industrial_Production.ipynb`
 or `https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/GDP_Composition.ipynb`
 or `https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/Labor_Productivity.ipynb`
+or `https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/Disposable_Income_and_Savings.ipynb`
+or `https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/Stock_Market.ipynb`
 5. Click the search icon
 6. Enjoy  
   In some of the notebooks I make use of additional python code I developed (e.g. `Current_Riskfree_Rates.ipynb`) or dependencies that are not by default provisioned in Google Colaboratory. When running these notebooks in Colaboratory, it's important to clone this repository and `cd` to it. I crated a commented out cell at the beginning of these notebooks to make it easier. Please don't forget to uncomment its content and run it first. E.g. here's one from `Current_Riskfree_Rates.ipynb`:
