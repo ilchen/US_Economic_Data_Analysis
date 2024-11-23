@@ -9,6 +9,15 @@ import warnings
 
 import yfinance as yfin
 
+from requests import Session
+from requests_cache import CacheMixin, SQLiteCache
+from requests_ratelimiter import LimiterMixin, MemoryQueueBucket
+from pyrate_limiter import Duration, RequestRate, Limiter
+
+
+class CachedLimiterSession(CacheMixin, LimiterMixin, Session):
+   pass
+
 
 class Metrics:
     """
@@ -25,6 +34,9 @@ class Metrics:
     VOLATILITY = 'Volatility'
     TRADING_DAYS_IN_YEAR = 252
     TO_ANNUAL_MULTIPLIER = sqrt(TRADING_DAYS_IN_YEAR)
+    INDEX_TO_VOLATILITY_MAP = {
+        '^GSPC': '^VIX'
+    }
 
     def __init__(self, tickers, additional_share_classes=None, stock_index=None, start=None, hist_shares_outs=None,
                  tickers_to_correct_for_splits=None, currency_conversion_df=None):
@@ -54,8 +66,16 @@ class Metrics:
                                        a DataFrame whose columns are suffixes such as '.L', '.SW', '.CO', etc. and whose
                                        rows are the corresponding conversion rates.
         """
+        session = CachedLimiterSession(
+            limiter=Limiter(RequestRate(2, Duration.SECOND)),  # max 2 requests per second
+            bucket_class=MemoryQueueBucket,
+            backend=SQLiteCache('yfinance.cache'),
+        )
+        session.headers['User-agent'] = 'https://github.com/ilchen/US_Economic_Data_Analysis/1.0'
+        self.session = session
+
         self.ticker_symbols = tickers
-        self.tickers = yfin.Tickers(list(self.ticker_symbols.keys()))
+        self.tickers = yfin.Tickers(list(self.ticker_symbols.keys()), session)
         # When calculating market capitalization and trading volumes, we need to use nominal close prices
         # and not adjusted close prices
         self.data = self.tickers.download(start=start, auto_adjust=False, actions=False, ignore_tz=True)
@@ -236,8 +256,8 @@ class Metrics:
         if stock_index is not None:
             # Handy to get earlier data for the index for more accurate estimate of volatility
             self.stock_index_data = yfin.download(
-                stock_index, start=start - pd.DateOffset(years=3), auto_adjust=True, actions=False, ignore_tz=True)\
-                    .loc[:, (Metrics.ADJ_CLOSE, stock_index)]
+                stock_index, start=start - pd.DateOffset(years=3), auto_adjust=True, actions=False, ignore_tz=True,
+                    session=session).loc[:, (Metrics.ADJ_CLOSE, stock_index)]
             #        .loc[:, Metrics.ADJ_CLOSE], worked in older versions of yfinance
             
             # Required until the 'ignore_tz' parameter in the 'download' method starts working again
@@ -424,7 +444,7 @@ class Metrics:
         """
         return self.get_daily_turnover(frequency, tickers) * self.TRADING_DAYS_IN_YEAR
 
-    def get_annual_volatility(self, alpha=1-.94453, frequency='ME'):
+    def get_annual_volatility(self, alpha=1-.94453, frequency='ME', include_next_month=False):
         """
         Calculates an annual volatility of a market represented by the stock market index used when constructing
         this instance of Metrics. It uses an exponentially weighted moving average (EWMA) with a given smoothing factor
@@ -435,13 +455,23 @@ class Metrics:
                       multiplied by 'alpha', while the previous estimate of EMWA by '(1-alpha)'
         :param frequency: a standard Pandas frequency designator
             https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#timeseries-offset-aliases
+        :param include_next_month: indicates if the implied volatility for the next month derived from index options
+                                   should be included
         :returns: a pd.Series object capturing the volatility
         """
         if self.stock_index_data is None:
             return None
         vol = self.stock_index_data.pct_change().ewm(alpha=alpha).std() * self.TO_ANNUAL_MULTIPLIER
         st = MonthBegin(0).rollback(self.data.index[0])
-        return vol.resample(frequency).mean().dropna().rename(self.VOLATILITY).loc[st:]
+        ret = vol.resample(frequency).mean().dropna().rename(self.VOLATILITY).loc[st:]
+        idx_name = self.stock_index_data.name[1] if self.stock_index_data.name is not None else None
+        if include_next_month and idx_name is not None and idx_name in self.INDEX_TO_VOLATILITY_MAP\
+                and frequency in ['ME', 'MS']:
+            impl_volatility = yfin.Ticker(self.INDEX_TO_VOLATILITY_MAP[idx_name], session=self.session).history()
+            impl_volatility = impl_volatility.loc[:, self.CLOSE].resample(frequency).last() / 100.
+            impl_volatility.index = impl_volatility.index.shift(1)
+            ret = pd.concat([ret, impl_volatility.tz_localize(None).iloc[-1:]])
+        return ret
 
     def get_current_components(self):
         """
@@ -470,9 +500,9 @@ class Metrics:
         n = len(tickers)
         st = MonthBegin(0).rollback(self.stock_index_data.index[-1] - pd.DateOffset(years=years))
         if use_adjusted_close:
-            tickers = yfin.Tickers(tickers) if n > 1 else yfin.Ticker(tickers[0])
+            tickers = yfin.Tickers(tickers, self.session) if n > 1 else yfin.Ticker(tickers[0], self.session)
             # When calculating the Beta of a portfolio relative to the market, it's better to use adjusted close prices
-            # and not adjusted close prices
+            # and not close prices
             if n > 1:
                 portfolio = tickers.download(start=MonthBegin(0).rollback(self.data.index[0]),
                                              auto_adjust=True, actions=False, ignore_tz=True)

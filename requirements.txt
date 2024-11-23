@@ -9,6 +9,7 @@ pandas-datareader>=0.10.0
 jupyter>=1.0.0
 Jinja2>=3.1.2
 yfinance>=0.2.46
+yfinance>=0.2.46[nospam]
 eurostat>=1.0.1
 seaborn>=0.12.0
 sdmx1>=2.17.0
