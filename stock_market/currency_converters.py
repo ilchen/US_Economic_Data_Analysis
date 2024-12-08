@@ -12,7 +12,8 @@ class EuroCurrencyConverter:
 
     CURRENCY_MAP = {
         '.L': 'GBPEUR=X', '.SW': 'CHFEUR=X', '.ST': 'SEKEUR=X',
-        '.CO': 'DKKEUR=X', '.OL': 'NOKEUR=X', '.PR': 'CZKEUR=X'
+        '.CO': 'DKKEUR=X', '.OL': 'NOKEUR=X', '.PR': 'CZKEUR=X',
+        '.WA': 'PLNEUR=X'
     }
     INVERSE_MAP = {v: k for k, v in CURRENCY_MAP.items()}
 

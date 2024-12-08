@@ -919,15 +919,15 @@ class EuropeBanksStockMarketMetrics(Metrics):
         """
         Returns a list of ticker symbols of Stoxx Europe 600 Banks Index.
         """
-        return ['INGA.AS', 'ABN.AS', 'DBK.DE', 'CBK.DE', 'BNP.PA', 'ACA.PA', 'GLE.PA', 'KBC.BR', 'BIRG.IR',
-                'BBVA.MC', 'BKT.MC', 'CABK.MC', 'SAB.MC', 'SAN.MC', 'EBS.VI', 'RBI.VI', 'NDA-FI.HE',
-                'ISP.MI', 'UCG.MI', 'MB.MI', 'BAMI.MI', 'BPE.MI',
-                'HSBA.L', 'BARC.L', 'LLOY.L', 'NWG.L', 'VMUK.L', 'STAN.L',
+        return ['INGA.AS', 'ABN.AS', 'DBK.DE', 'CBK.DE', 'BNP.PA', 'ACA.PA', 'GLE.PA', 'KBC.BR', 'BIRG.IR', 'A5G.IR',
+                'BBVA.MC', 'BKT.MC', 'CABK.MC', 'SAB.MC', 'SAN.MC', 'EBS.VI', 'BG.VI', 'NDA-FI.HE',
+                'ISP.MI', 'UCG.MI', 'FBK.MI', 'BAMI.MI', 'BPE.MI',
+                'HSBA.L', 'BARC.L', 'LLOY.L', 'NWG.L', 'INVP.L', 'STAN.L',
                 'BAER.SW', 'UBSG.SW', 'CMBN.SW',
                 'SEB-A.ST', 'SWED-A.ST', 'SHB-A.ST',
                 'DANSKE.CO', 'SYDB.CO', 'JYSK.CO',
                 'DNB.OL',
-                'KOMB.PR']
+                'KOMB.PR', 'PEO.WA', 'PKO.WA']
 
     @staticmethod
     def tickers_to_dict(tickers, st):
