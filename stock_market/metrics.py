@@ -37,6 +37,7 @@ class Metrics:
     INDEX_TO_VOLATILITY_MAP = {
         '^GSPC': '^VIX'
     }
+    BANKING_INDUSTRIES = {'capital-markets', 'banks-diversified', 'banks-regional'}
 
     def __init__(self, tickers, additional_share_classes=None, stock_index=None, start=None, hist_shares_outs=None,
                  tickers_to_correct_for_splits=None, currency_conversion_df=None):
@@ -606,6 +607,22 @@ class Metrics:
                     ret.loc[ticker, 'P/B'] /= 100.
         return ret
 
+    def get_banking_sector_components(self):
+        """
+        Returns a list of ticker symbols from the market this object represents that belong to the banking sector.
+        The banking sector is defined as companies belonging to the 'Financial Services' sector and one of the following
+        three industries: banks-regional, banks-diversified, capital-markets. The latter represents banks such as
+        Goldman Sachs and Morgan Stanley.
+        """
+        ret = []
+        for ticker in self.get_current_components():
+            if ticker in self.additional_share_classes:
+                # Ignoring additional share class for {ticker} to avoid double counting'
+                continue
+            if self.tickers.tickers[ticker].info.get('industryKey') in self.BANKING_INDUSTRIES:
+                ret.append(ticker)
+        return ret
+
     @staticmethod
     def get_exchange_suffix(ticker):
         comps = ticker.split('.')
@@ -680,17 +697,6 @@ class USStockMarketMetrics(Metrics):
         return sp500_components, additional_share_classes
 
     @staticmethod
-    def get_sp500_banking_sector_components():
-        """
-        Returns a list of ticker symbols of S&P 500 Stock Index companies that belong to the banking sector.
-        """
-        table = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
-        df = table[0]
-        # Correction for Yahoo-Finance's representation of Class B shares
-        cps = df.loc[(df['GICS Sector'] == 'Financials') & (df['GICS Sub-Industry'].str.find('Banks') != -1), 'Symbol']
-        return [ticker.replace('.', '-') for ticker in cps.to_list()]
-
-    @staticmethod
     def get_sp500_historical_components(start=None):
         """
         Returns a dictionary whose keys are ticker symbols representing companies that were part of the S&P 500 Index
@@ -762,6 +768,13 @@ class USStockMarketMetrics(Metrics):
                 'CERN': pd.Series([311937692, 304348600, 305381551, 306589898, 301317068, 294222760, 294098094],
                                   index=pd.DatetimeIndex(['2020-01-28', '2020-04-23', '2020-07-22', '2020-10-21',
                                                           '2021-04-30', '2021-10-25', '2022-04-26']).map(last_bd)),
+                'CTLT': pd.Series([164697598, 170226514, 170341553, 170787238, 171188042, 179104173, 179213237,
+                                   179895677, 179963589, 180090483, 180271741,
+                                   180641272, 180737675, 180979849, 181511586],
+                                  index=pd.DatetimeIndex(['2020-10-29', '2021-01-25', '2021-04-27', '2021-08-23',
+                                                          '2021-10-26', '2022-01-25', '2022-04-26', '2022-08-25',
+                                                          '2022-10-27', '2023-01-31', '2023-05-31', '2023-11-30',
+                                                          '2024-01-31', '2024-04-25', '2024-10-28']).map(last_bd)),
                 'CTXS': pd.Series([123450644, 123123572, 124167045, 124230000, 124722872, 126579926, 126885081],
                                   index=pd.DatetimeIndex(['2020-04-28', '2020-10-23', '2021-04-29', '2021-06-30',
                                                           '2021-11-01', '2022-04-27', '2022-07-18']).map(last_bd)),
