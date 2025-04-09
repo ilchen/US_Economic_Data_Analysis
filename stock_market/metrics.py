@@ -468,7 +468,8 @@ class Metrics:
         idx_name = self.stock_index_data.name[1] if self.stock_index_data.name is not None else None
         if include_next_month and idx_name is not None and idx_name in self.INDEX_TO_VOLATILITY_MAP\
                 and frequency in ['ME', 'MS']:
-            impl_volatility = yfin.Ticker(self.INDEX_TO_VOLATILITY_MAP[idx_name], session=self.session).history()
+            impl_volatility = yfin.Ticker(self.INDEX_TO_VOLATILITY_MAP[idx_name], session=self.session)\
+                .history(period='5d')
             impl_volatility = impl_volatility.loc[:, self.CLOSE].resample(frequency).last() / 100.
             impl_volatility.index = impl_volatility.index.shift(1)
             ret = pd.concat([ret, impl_volatility.tz_localize(None).iloc[-1:]])
