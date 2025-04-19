@@ -83,7 +83,13 @@ class Metrics:
         self.data = self.data.loc[:, ([Metrics.CLOSE, Metrics.VOLUME])]
 
         # Required until the 'ignore_tz' parameter in the 'download' method starts working again
-        self.data.index = self.data.index.tz_localize(None)
+        # self.data.index = self.data.index.tz_localize(None)
+
+        # If some stocks that are no longer part of the index and are no longer listed were traded over the counter,
+        # while stocks still in the index were not traded, we need to make an adjustment
+        idx = self.data.loc[:, (Metrics.CLOSE, self.get_current_components())].dropna(how='all').index
+        if len(idx) < len(self.data):
+            self.data = self.data.loc[idx]
 
         # In case some stocks captured in the tickers list were not trading during the date range,
         # I assume they were trading using their first price.
