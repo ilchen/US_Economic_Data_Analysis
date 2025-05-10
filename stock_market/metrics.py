@@ -296,12 +296,37 @@ class Metrics:
             for ticker in tickers:
                 (st, ed) = self.ticker_symbols[ticker]
                 ret += self.data.loc[st:ed, (Metrics.CLOSE, ticker)] * self.shares_outstanding[ticker].loc[st:ed]
-            return ret.resample(frequency).mean().ret.dropna()
+            return ret.resample(frequency).mean().dropna()
 
     def adjust_for_additional_share_classes(self, cap_series):
         for additional_share_class, main_share_class in self.additional_share_classes.items():
             cap_series.loc[main_share_class] += cap_series.loc[additional_share_class]
             cap_series.drop(additional_share_class, inplace=True)
+
+    def get_capitalization_for_companies(self, tickers, frequency='ME', merge_additional_share_classes=True):
+        """
+        Calculates the capitalization of stocks represented by the 'tickers' parameter.
+        Downsamples if a less granular frequency than daily is specified. Takes an average capitalization over periods
+        implied by the 'frequency' parameter when doing so.
+
+        :param tickers: a list of one or more ticker symbols
+        :param frequency: a standard Pandas frequency designator
+            https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#timeseries-offset-aliases
+        :param merge_additional_share_classes: for companies that have multiple share classes listed (e.g. Google),
+                                               indicates whether to merge the capitalization of different share classes
+                                               into one
+        :returns: a pd.DataFrame object capturing the capitalization of the companies represented by the 'tickers' parameter
+        """
+        if tickers is None or not set(tickers) <= self.ticker_symbols.keys():
+            raise ValueError('Provided tickers list doesn''t represent a subset of the market')
+        cap_df = self.capitalization.loc[:, [self.CAPITALIZATION] + tickers]
+        if merge_additional_share_classes and len(self.additional_share_classes) > 0:
+            cap_df = cap_df.copy()
+            for additional_share_class, main_share_class in self.additional_share_classes.items():
+                if additional_share_class in tickers and main_share_class in tickers:
+                    cap_df.loc[:, main_share_class] += cap_df.loc[:, additional_share_class]
+                    cap_df.drop(additional_share_class, axis=1, inplace=True)
+        return cap_df.resample(frequency).mean().dropna()
 
     def get_top_n_capitalization_companies_for_day(self, n, dt=None, merge_additional_share_classes=True):
         """
@@ -682,7 +707,7 @@ class USStockMarketMetrics(Metrics):
         """
         Returns a pair whose first component is a list capturing the current constituent components of
         the S&P 500 Stock Index and whose second component is a dictionary of companies in S&P500 that have multiple
-        share classes as part of the index, the keys are additional shares tickers ticker symbols and values
+        share classes as part of the index, the keys are additional shares ticker symbols and values
         are the first share class (typically class A). Three corporations in the index have class B or class C shares.
         """
         table = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
