@@ -318,9 +318,12 @@ class Metrics:
         :returns: a pd.DataFrame object capturing the capitalization of the companies represented by the 'tickers' parameter
         """
         if tickers is None or not set(tickers) <= self.ticker_symbols.keys():
-            raise ValueError('Provided tickers list doesn''t represent a subset of the market')
+            raise ValueError("Ticker symbols passed don't represent a subset of the market. "
+                             'The following ticker symbols are not part of the market: '
+                             f'{set(tickers) - self.ticker_symbols.keys()}')
         cap_df = self.capitalization.loc[:, [self.CAPITALIZATION] + tickers]
-        if merge_additional_share_classes and len(self.additional_share_classes) > 0:
+        if merge_additional_share_classes and len(self.additional_share_classes) > 0\
+                and set(tickers) & self.additional_share_classes.keys():
             cap_df = cap_df.copy()
             for additional_share_class, main_share_class in self.additional_share_classes.items():
                 if additional_share_class in tickers and main_share_class in tickers:
