@@ -647,7 +647,7 @@ class Metrics:
         Returns a list of ticker symbols from the market this object represents that belong to the banking sector.
         The banking sector is defined as companies belonging to the 'Financial Services' sector and one of the following
         three industries: banks-regional, banks-diversified, capital-markets. The latter represents banks such as
-        Goldman Sachs and Morgan Stanley.
+        The Goldman Sachs and Morgan Stanley.
         """
         ret = []
         for ticker in self.get_current_components():
@@ -656,6 +656,34 @@ class Metrics:
                 continue
             if self.tickers.tickers[ticker].info.get('industryKey') in self.BANKING_INDUSTRIES:
                 ret.append(ticker)
+        return ret
+
+    def tickers_to_display_names(self, tickers, max_len=15):
+        """
+        Returns displayable names for ticker symbols passed via the 'tickers' parameter.
+
+        :param tickers: an iterable object containing ticker symbols whose display names need to be looked up
+        :param max_len: designates the maximum length of a name, in case a name is longer than 'max_len' it gets
+                        trimmed to 'max_len' with the last two symbols being '..', it must be at least 7 symbols long.
+                        If you want a shorter name, just use the ticker symbol.
+        :returns: a list object having the same length as the 'tickers' parameter and containing the corresponding
+                  displayable names for each ticker
+        """
+        if max_len < 7:
+            raise ValueError(f"max_len of {max_len} is too short, you'd better use ticker symbols directly")
+        ret = []
+        market_comps = self.ticker_symbols.keys()
+        for ticker in tickers:
+            if ticker in market_comps and self.tickers.tickers[ticker]:
+                dn = self.tickers.tickers[ticker].info.get('displayName')
+                if not dn:
+                    dn = self.tickers.tickers[ticker].info.get('shortName')
+                if dn.lower().startswith('the '):
+                    dn = dn[4:]
+                if len(dn) > max_len:
+                    dn = dn[:max_len].rstrip()
+                    dn = dn[:len(dn)-2] + '..'
+                ret.append(dn)
         return ret
 
     @staticmethod
