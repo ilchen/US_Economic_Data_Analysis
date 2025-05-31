@@ -98,10 +98,12 @@ class Metrics:
         # Unfortunately Yahoo-Finance provides dividend yield only for the most recent trading day
         self.dividend_yield = {}
         self.pe = {}
+        self.eps = {}
         for ticker in self.get_current_components():
             info = self.tickers.tickers[ticker].info
             dividend_yield = info.get('dividendYield')
             pe = info.get('forwardPE')
+            eps = info.get('forwardEps')
 
             # A kludge for London Stock Exchange, Yahoo-Finance sometimes reports incorrect forwardPEs
             sfx = self.get_exchange_suffix(ticker)
@@ -109,12 +111,12 @@ class Metrics:
                 trailing_pe = info.get('trailingPE')
                 if trailing_pe is not None and trailing_pe / pe < .05:
                     trailing_eps = info.get('trailingEps')
-                    eps = info.get('forwardEps')
                     if trailing_eps is not None and eps is not None:
                         pe = trailing_pe * trailing_eps / eps
 
             self.dividend_yield[ticker] = 0. if dividend_yield is None else dividend_yield
             self.pe[ticker] = 0. if pe is None else pe
+            self.eps[ticker] = 0. if eps is None else eps
 
         # Inplace setting is perfectly fine
         warnings.filterwarnings('ignore', message='In a future version, `df.+` will attempt to set the values inplace',
@@ -252,11 +254,10 @@ class Metrics:
             if ticker in self.get_current_components():
                 self.forward_dividend_yield += (df.iloc[:,0] * self.shares_outstanding[ticker]).iloc[-1]\
                     * self.dividend_yield[ticker]
-                self.forward_PE += (df.iloc[:,0] * self.shares_outstanding[ticker]).iloc[-1] \
-                    * self.pe[ticker]
+                self.forward_PE += self.shares_outstanding[ticker].iloc[-1] * self.eps[ticker]
 
         self.forward_dividend_yield /= self.capitalization.iloc[-1,0]
-        self.forward_PE /= self.capitalization.iloc[-1,0]
+        self.forward_PE = self.capitalization.iloc[-1,0] / self.forward_PE
 
         # Given that a stock index is used for calculating volatility, we need to use adjusted close prices.
         self.stock_index_data = stock_index
@@ -724,7 +725,7 @@ class USStockMarketMetrics(Metrics):
                           'ODFL', 'MCHP', 'APH', 'DTE', 'FTV', 'MTCH', 'MKC', 'MRK', 'PFE', 'RJF', 'RTX', 'ROL', 'TT',
                           'SLG', 'FTI', 'NVDA', 'CMG', 'AVGO', 'WRB', 'EXC', 'BWA', 'K', 'IP', 'O', 'PCAR', 'DHR',
                           'BBWI', 'BDX', 'ZBH', 'SRE', 'MMM', 'IBM', 'T', 'CTAS', 'DECK', 'SMCI', 'LRCX', 'J', 'TSCO',
-                          'ETR', 'LEN', 'WDC'])
+                          'ETR', 'LEN', 'WDC', 'FAST'])
 
         # Using Market Yield on U.S. Treasury Securities at 1-Year Constant Maturity, as proxy for riskless rate
         # Handy to get earlier data for more accurate estimates of volatility
@@ -871,17 +872,19 @@ class USStockMarketMetrics(Metrics):
                                   index=pd.DatetimeIndex(['2020-02-25', '2020-05-01', '2020-07-31', '2020-10-23',
                                                           '2021-02-19', '2021-04-30']).map(last_bd)),
                 'GOOG': pd.Series([340979832, 336162278, 333631113, 329867212, 327556472, 323580001, 320168491,
-                                   317737778, 315639479, 313376417, 311278353, 6163000000, 6086000000, 5968000000],
+                                   317737778, 315639479, 313376417, 311278353, 6163000000, 6086000000, 5968000000,
+                                   5801000000],
                                   index=pd.DatetimeIndex(['2020-01-27', '2020-04-21', '2020-07-23', '2020-10-22',
                                                           '2021-01-26', '2021-04-20', '2021-07-20', '2021-10-19',
                                                           '2022-01-25', '2022-04-19', '2022-07-15', '2022-07-22',
-                                                          '2022-10-18', '2023-01-26']).map(last_bd)),
+                                                          '2022-10-18', '2023-01-26', '2023-07-18']).map(last_bd)),
                 'GOOGL': pd.Series([299895185, 300050444, 300471156, 300643829, 300737081, 300746844, 301084627,
-                                    300809676, 300754904, 300763622, 300446626, 5996000000, 5973000000, 5956000000],
+                                    300809676, 300754904, 300763622, 300446626, 5996000000, 5973000000, 5956000000,
+                                    5933000000],
                                    index=pd.DatetimeIndex(['2020-01-27', '2020-04-21', '2020-07-23', '2020-10-22',
                                                            '2021-01-26', '2021-04-20', '2021-07-20', '2021-10-19',
                                                            '2022-01-25', '2022-04-19', '2022-07-15', '2022-07-22',
-                                                           '2022-10-18', '2023-01-26']).map(last_bd)),
+                                                           '2022-10-18', '2023-01-26', '2023-07-18']).map(last_bd)),
                 'INFO': pd.Series([392948672, 398916408, 396809671, 398358566, 398612292, 398841378, 399080370],
                                   index=pd.DatetimeIndex(['2019-12-31', '2020-02-29', '2020-05-31', '2020-08-31',
                                                           '2021-05-31', '2021-08-31', '2021-12-31']).map(last_bd)),
