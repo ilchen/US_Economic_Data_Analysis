@@ -9,15 +9,6 @@ import warnings
 
 import yfinance as yfin
 
-from requests import Session
-from requests_cache import CacheMixin, SQLiteCache
-from requests_ratelimiter import LimiterMixin, MemoryQueueBucket
-from pyrate_limiter import Duration, RequestRate, Limiter
-
-
-class CachedLimiterSession(CacheMixin, LimiterMixin, Session):
-   pass
-
 
 class Metrics:
     """
@@ -67,16 +58,8 @@ class Metrics:
                                        a DataFrame whose columns are suffixes such as '.L', '.SW', '.CO', etc. and whose
                                        rows are the corresponding conversion rates.
         """
-        session = CachedLimiterSession(
-            limiter=Limiter(RequestRate(2, Duration.SECOND)),  # max 2 requests per second
-            bucket_class=MemoryQueueBucket,
-            backend=SQLiteCache('yfinance.cache'),
-        )
-        session.headers['User-agent'] = 'https://github.com/ilchen/US_Economic_Data_Analysis/1.0'
-        self.session = session
-
         self.ticker_symbols = tickers
-        self.tickers = yfin.Tickers(list(self.ticker_symbols.keys()), session)
+        self.tickers = yfin.Tickers(list(self.ticker_symbols.keys()))
         # When calculating market capitalization and trading volumes, we need to use nominal close prices
         # and not adjusted close prices
         self.data = self.tickers.download(start=start, auto_adjust=False, actions=False, ignore_tz=True)
@@ -264,8 +247,8 @@ class Metrics:
         if stock_index is not None:
             # Handy to get earlier data for the index for more accurate estimate of volatility
             self.stock_index_data = yfin.download(
-                stock_index, start=start - pd.DateOffset(years=3), auto_adjust=True, actions=False, ignore_tz=True,
-                    session=session).loc[:, (Metrics.ADJ_CLOSE, stock_index)]
+                stock_index, start=start - pd.DateOffset(years=3), auto_adjust=True, actions=False, ignore_tz=True)\
+                        .loc[:, (Metrics.ADJ_CLOSE, stock_index)]
             #        .loc[:, Metrics.ADJ_CLOSE], worked in older versions of yfinance
             
             # Required until the 'ignore_tz' parameter in the 'download' method starts working again
@@ -503,8 +486,7 @@ class Metrics:
         idx_name = self.stock_index_data.name[1] if self.stock_index_data.name is not None else None
         if include_next_month and idx_name is not None and idx_name in self.INDEX_TO_VOLATILITY_MAP\
                 and frequency in ['ME', 'MS']:
-            impl_volatility = yfin.Ticker(self.INDEX_TO_VOLATILITY_MAP[idx_name], session=self.session)\
-                .history(period='5d')
+            impl_volatility = yfin.Ticker(self.INDEX_TO_VOLATILITY_MAP[idx_name]).history(period='5d')
             impl_volatility = impl_volatility.loc[:, self.CLOSE].resample(frequency).last() / 100.
             impl_volatility.index = impl_volatility.index.shift(1)
             ret = pd.concat([ret, impl_volatility.tz_localize(None).iloc[-1:]])
@@ -537,7 +519,7 @@ class Metrics:
         n = len(tickers)
         st = MonthBegin(0).rollback(self.stock_index_data.index[-1] - pd.DateOffset(years=years))
         if use_adjusted_close:
-            tickers = yfin.Tickers(tickers, self.session) if n > 1 else yfin.Ticker(tickers[0], self.session)
+            tickers = yfin.Tickers(tickers) if n > 1 else yfin.Ticker(tickers[0])
             # When calculating the Beta of a portfolio relative to the market, it's better to use adjusted close prices
             # and not close prices
             if n > 1:
