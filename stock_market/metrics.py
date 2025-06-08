@@ -160,10 +160,13 @@ class Metrics:
 
         # Currency conversion
         if currency_conversion_df is not None:
+            cur_comps_set = set(self.get_current_components())
             for ticker in self.ticker_symbols.keys():
                 sfx = self.get_exchange_suffix(ticker)
                 if sfx in currency_conversion_df.columns:
                     self.data.loc[:, (self.CLOSE, ticker)] *= currency_conversion_df.loc[self.data.index, sfx]
+                    if ticker in cur_comps_set:
+                        self.eps[ticker] *= currency_conversion_df.loc[self.data.index[-1], sfx]
 
         self.shares_outstanding = {}
         for ticker in self.ticker_symbols.keys():
@@ -249,14 +252,11 @@ class Metrics:
                 self.forward_dividend_yield += (df.iloc[:,0] * self.shares_outstanding[ticker]).iloc[-1]\
                     * self.dividend_yield[ticker]
 
-                # Cannot calculate forward P/E for the whole market capitalization-based in case of multiple countries,
-                # reverting to taking a weighted average
-                self.forward_PE += self.shares_outstanding[ticker].iloc[-1] * self.eps[ticker] if num_countries == 1\
-                        else (df.iloc[:, 0] * self.shares_outstanding[ticker]).iloc[-1] * self.pe[ticker]
+                # Calculating forward P/E for the whole market using a capitalization-weighted approach
+                self.forward_PE += self.shares_outstanding[ticker].iloc[-1] * self.eps[ticker]
 
         self.forward_dividend_yield /= self.capitalization.iloc[-1,0]
-        self.forward_PE = self.capitalization.iloc[-1,0] / self.forward_PE if num_countries == 1\
-                else self.forward_PE / self.capitalization.iloc[-1,0]
+        self.forward_PE = self.capitalization.iloc[-1,0] / self.forward_PE
 
         # Given that a stock index is used for calculating volatility, we need to use adjusted close prices.
         self.stock_index_data = stock_index
@@ -674,9 +674,9 @@ class Metrics:
         market_comps = self.ticker_symbols.keys()
         for ticker in tickers:
             if ticker in market_comps and self.tickers.tickers[ticker]:
-                dn = self.tickers.tickers[ticker].info.get('displayName')
-                if not dn:
-                    dn = self.tickers.tickers[ticker].info.get('shortName')
+                dn = self.tickers.tickers[ticker].info.get('displayName')\
+                      or self.tickers.tickers[ticker].info.get('shortName')\
+                      or self.tickers.tickers[ticker].info.get('longBusinessSummary')
                 if dn.lower().startswith('the '):
                     dn = dn[4:]
                 if len(dn) > max_len:
@@ -1008,16 +1008,17 @@ class EuropeBanksStockMarketMetrics(Metrics):
     def get_stoxx_europe_banks_components():
         """
         Returns a list of ticker symbols of Stoxx Europe 600 Banks Index.
+        Based on rebalancing in H1 2025.
         """
         return ['INGA.AS', 'ABN.AS', 'DBK.DE', 'CBK.DE', 'BNP.PA', 'ACA.PA', 'GLE.PA', 'KBC.BR', 'BIRG.IR', 'A5G.IR',
-                'BBVA.MC', 'BKT.MC', 'CABK.MC', 'SAB.MC', 'SAN.MC', 'EBS.VI', 'BG.VI', 'NDA-FI.HE',
-                'ISP.MI', 'UCG.MI', 'FBK.MI', 'BAMI.MI', 'BPE.MI',
-                'HSBA.L', 'BARC.L', 'LLOY.L', 'NWG.L', 'INVP.L', 'STAN.L', 'CBG.L',
+                'BBVA.MC', 'BKT.MC', 'CABK.MC', 'SAB.MC', 'SAN.MC', 'EBS.VI', 'BG.VI', 'RBI.VI', 'NDA-FI.HE',
+                'ISP.MI', 'UCG.MI', 'FBK.MI', 'BAMI.MI', 'BPE.MI', 'BMPS.MI', 'BPSO.MI', 'BGN.MI',
+                'HSBA.L', 'BARC.L', 'LLOY.L', 'NWG.L', 'INVP.L', 'STAN.L',
                 'BCVN.SW', 'CMBN.SW',
                 'SEB-A.ST', 'SWED-A.ST', 'SHB-A.ST', 'AZA.ST',
                 'DANSKE.CO', 'SYDB.CO', 'JYSK.CO', 'RILBA.CO',
-                'DNB.OL',
-                'PEO.WA', 'PKO.WA']
+                'DNB.OL', 'SB1NO.OL',
+                'PEO.WA', 'PKO.WA', 'SPL.WA']
 
     @staticmethod
     def tickers_to_dict(tickers, st):
