@@ -74,6 +74,13 @@ class Metrics:
         if len(idx) < len(self.data):
             self.data = self.data.loc[idx]
 
+        # For markets composed of stocks traded on different exchanges such as SX7V, it can happen that some stocks
+        # were not traded on the last trading day. In this case forward-fill their prices and trading volumes
+        # from the last trading day
+        col_idx = self.data.isna().iloc[-1]
+        if len(self.data.loc[self.data.index[-1], ~col_idx]) > len(self.data.loc[self.data.index[-1], col_idx]):
+            self.data.loc[self.data.index[-1], col_idx] = self.data.loc[self.data.index[-2], col_idx]
+
         # In case some stocks captured in the tickers list were not trading during the date range,
         # I assume they were trading using their first price.
         self.data.bfill(inplace=True)
@@ -92,10 +99,13 @@ class Metrics:
             sfx = self.get_exchange_suffix(ticker)
             if sfx == '.L':
                 trailing_pe = info.get('trailingPE')
-                if trailing_pe is not None and trailing_pe / pe < .05:
-                    trailing_eps = info.get('trailingEps')
-                    if trailing_eps is not None and eps is not None:
-                        pe = trailing_pe * trailing_eps / eps
+                if trailing_pe is not None:
+                    if trailing_pe / pe < .05:
+                        trailing_eps = info.get('trailingEps')
+                        if trailing_eps is not None and eps is not None:
+                            pe = trailing_pe * trailing_eps / eps
+                    elif pe / trailing_pe < .05:
+                        pe *= 100.
 
             self.dividend_yield[ticker] = 0. if dividend_yield is None else dividend_yield
             self.pe[ticker] = 0. if pe is None else pe
@@ -211,6 +221,7 @@ class Metrics:
             # Getting rid of extraneous dates
             self.shares_outstanding[ticker] = shares_outst.loc[self.data.index]
 
+        num_countries = len({self.get_exchange_suffix(ticker) for ticker in self.get_current_components()})
         warnings.filterwarnings('ignore', message='DataFrame is highly fragmented',
                                 category=pd.errors.PerformanceWarning)
         self.capitalization = pd.DataFrame(0., index=self.data.index,
@@ -237,10 +248,15 @@ class Metrics:
             if ticker in self.get_current_components():
                 self.forward_dividend_yield += (df.iloc[:,0] * self.shares_outstanding[ticker]).iloc[-1]\
                     * self.dividend_yield[ticker]
-                self.forward_PE += self.shares_outstanding[ticker].iloc[-1] * self.eps[ticker]
+
+                # Cannot calculate forward P/E for the whole market capitalization-based in case of multiple countries,
+                # reverting to taking a weighted average
+                self.forward_PE += self.shares_outstanding[ticker].iloc[-1] * self.eps[ticker] if num_countries == 1\
+                        else (df.iloc[:, 0] * self.shares_outstanding[ticker]).iloc[-1] * self.pe[ticker]
 
         self.forward_dividend_yield /= self.capitalization.iloc[-1,0]
-        self.forward_PE = self.capitalization.iloc[-1,0] / self.forward_PE
+        self.forward_PE = self.capitalization.iloc[-1,0] / self.forward_PE if num_countries == 1\
+                else self.forward_PE / self.capitalization.iloc[-1,0]
 
         # Given that a stock index is used for calculating volatility, we need to use adjusted close prices.
         self.stock_index_data = stock_index
