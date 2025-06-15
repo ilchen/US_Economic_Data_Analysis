@@ -211,9 +211,16 @@ class Metrics:
                         self.data.loc[:correction.index[-1]].index.difference(correction.index))
                     correction = pd.concat([correction, pd.Series(np.nan, index=missing_dates_back)]).sort_index()
                     correction = correction.bfill()
-                    shares_outst.update(correction)
-                    print('\tExtra correction for the number of shares outstanding for {:s} for period '
-                          'from {:%Y-%m-%d} to {:%Y-%m-%d}'.format(ticker, self.data.index[0], correction.index[-1]))
+
+                    # As of late Yahoo-Finance reports correct shares outstanding data for some delisted shares.
+                    # I use these data from Yahoo-Finance in preference to more coarse-grained data from overrides
+                    # when it is clear that it is more accurate
+                    overlap_idx = shares_outst.index.intersection(correction.index)
+                    if len(overlap_idx) < 5  or  ((shares_outst.loc[overlap_idx] - correction[overlap_idx])
+                                                   / shares_outst.loc[overlap_idx]).abs().mean() > 0.02:
+                        shares_outst.update(correction)
+                        print('\tExtra correction for the number of shares outstanding for {:s} '
+                              'from {:%Y-%m-%d} to {:%Y-%m-%d}'.format(ticker, self.data.index[0], correction.index[-1]))
 
             # Yahoo-Finance doesn't report shares outstanding for each trading day. I compensate for it by rolling
             # forward the most recent reported value and then rolling backward the earliest available number.
@@ -723,7 +730,7 @@ class USStockMarketMetrics(Metrics):
                           'ODFL', 'MCHP', 'APH', 'DTE', 'FTV', 'MTCH', 'MKC', 'MRK', 'PFE', 'RJF', 'RTX', 'ROL', 'TT',
                           'SLG', 'FTI', 'NVDA', 'CMG', 'AVGO', 'WRB', 'EXC', 'BWA', 'K', 'IP', 'O', 'PCAR', 'DHR',
                           'BBWI', 'BDX', 'ZBH', 'SRE', 'MMM', 'IBM', 'T', 'CTAS', 'DECK', 'SMCI', 'LRCX', 'J', 'TSCO',
-                          'ETR', 'LEN', 'WDC', 'FAST'])
+                          'ETR', 'LEN', 'WDC', 'FAST', 'ORLY'])
 
         # Using Market Yield on U.S. Treasury Securities at 1-Year Constant Maturity, as proxy for riskless rate
         # Handy to get earlier data for more accurate estimates of volatility
@@ -902,8 +909,8 @@ class USStockMarketMetrics(Metrics):
                                                           '2021-04-16', '2021-08-10']).map(last_bd)),
                 'NBL': pd.Series([479698676, 479768764],
                                  index=pd.DatetimeIndex(['2020-03-31', '2020-06-30']).map(last_bd)),
-                'NLSN': pd.Series([356475591, 359941875],
-                                  index=pd.DatetimeIndex(['2020-03-31', '2022-09-30']).map(last_bd)),
+                'NLSN': pd.Series([356475591, 358497131, 359941875],
+                                  index=pd.DatetimeIndex(['2020-03-31', '2021-03-31', '2022-09-30']).map(last_bd)),
                 'PBCT': pd.Series([433739103, 424657609, 424777066, 428020009],
                                   index=pd.DatetimeIndex(['2020-02-14', '2020-04-30', '2020-07-31',
                                                           '2021-10-31']).map(last_bd)),
