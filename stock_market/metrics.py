@@ -3,6 +3,7 @@ import pandas as pd
 from pandas.tseries.offsets import YearBegin, BDay, MonthBegin
 import pandas_datareader.data as web
 from math import sqrt, isclose
+from collections import defaultdict
 from datetime import date, time, datetime
 import os
 import warnings
@@ -28,6 +29,7 @@ class Metrics:
     INDEX_TO_VOLATILITY_MAP = {
         '^GSPC': '^VIX'
     }
+    UNIDENTIFIED_SECTOR = 'unidentified'
     BANKING_INDUSTRIES = {'capital-markets', 'banks-diversified', 'banks-regional'}
 
     def __init__(self, tickers, additional_share_classes=None, stock_index=None, start=None, hist_shares_outs=None,
@@ -663,6 +665,46 @@ class Metrics:
             if self.tickers.tickers[ticker].info.get('industryKey') in self.BANKING_INDUSTRIES:
                 ret.append(ticker)
         return ret
+
+    def get_sector_breakdown_for_day(self, dt=None):
+        """
+        Compute the sector breakdown for the market on a specified day, based on relative capitalization.
+        
+        Parameters:
+            dt (str | int | date | datetime | pd.Timestamp, optional): 
+                The date for which to compute the sector breakdown. 
+                If None, defaults to the most recent business day available.
+        
+        Returns:
+            pd.Series: A series representing the market breakdown by sector, 
+                       with values proportional to each sector's total market capitalization.
+        """
+        if dt is None:
+            dt = self.data.index[-1]
+        idx = -1
+        dt = BDay(0).rollback(dt) if BDay(0).rollback(dt) <= self.data.index[idx] else self.data.index[idx]
+        while np.isnan(self.capitalization.loc[dt, self.CAPITALIZATION]):
+            idx -= 1
+            dt = self.data.index[idx]
+
+        ret = defaultdict(float)
+
+        for ticker in self.ticker_symbols.keys():
+            (st, ed) = self.ticker_symbols[ticker]
+            st = pd.Timestamp(st)
+
+            # The company fell out of the market before the day of inquiry
+            if ed is not None and pd.Timestamp(ed) < dt:
+                continue
+            # The company was added to the market after the day of inquiry
+            if st > dt:
+                continue
+
+            sector_key = self.tickers.tickers[ticker].info.get('sectorKey', Metrics.UNIDENTIFIED_SECTOR)
+            ret[sector_key] += self.data.loc[dt, (Metrics.CLOSE, ticker)]\
+                                  * self.shares_outstanding[ticker].loc[dt]
+
+        return pd.Series(ret) / self.capitalization.loc[dt, Metrics.CAPITALIZATION]
 
     def tickers_to_display_names(self, tickers, max_len=15):
         """
