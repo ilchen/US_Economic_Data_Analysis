@@ -196,7 +196,7 @@ class Metrics:
                 shares_outstanding = self.tickers.tickers[ticker].info.get('sharesOutstanding')
                 if shares_outstanding is not None and shares_outstanding * 1.2 < shares_outst.iloc[-1].item():
                     shares_outstanding2 = self.tickers.tickers[ticker].info.get('impliedSharesOutstanding')
-                    if shares_outstanding2 is None:
+                    if not shares_outstanding2:
                         shares_outstanding2 = shares_outst.iloc[-1].item()
                     print('Correcting the number of shares outstanding for {:s} from {:d} to {:d}'
                           .format(ticker, shares_outst.iloc[-1].item(),
@@ -740,6 +740,51 @@ class Metrics:
         sfx = '.' + comps[-1]
         return None if len(comps) == 1 else sfx
 
+    @staticmethod
+    def tickers_to_dict(tickers, st):
+        """
+        Converts a list of ticker symbols into a dictionary whose keys are the same ticker symbols and whose values
+        are (start-date, end-date) pairs indicating since when a particular ticker has been part of the market
+        """
+        return {ticker: (st, None) for ticker in tickers}
+
+    @staticmethod
+    def get_historical_components(cur_components, file_name, start=None):
+        """
+        Returns a dictionary whose keys are ticker symbols representing companies that were part of the S&P 500 Index
+        at any time since 'start' and whose values are pairs representing the dates of inclusion and exclusion from
+        the index. A start date of 'None' means the ticker was part of the index before 'start'. An end date of 'None'
+        implies the ticker is still part of the index.
+
+        :param start: an int, float, str, datetime, or date object designating the starting time for calculating the
+                      history of the constituent components of the S&P 500 Index.
+        """
+        if type(start) is date:
+            start = datetime.combine(start, time())
+        start = pd.to_datetime(start)
+        all_components = cur_components.copy()
+        ret = {ticker: (start, None) for ticker in all_components}
+        removed_tickers = set()
+
+        df = pd.read_csv(file_name, index_col=[0])
+        for idx, row in df[::-1].iterrows():
+            ts = pd.to_datetime(idx)
+            if ts < start:
+                break
+            for added_ticker in [] if pd.isnull(row.iloc[0]) else row.iloc[0].split(','):
+                _, end = ret[added_ticker]
+                ret[added_ticker] = (ts, end)
+
+            for removed_ticker in [] if pd.isnull(row.iloc[1]) else row.iloc[1].split(','):
+                ret[removed_ticker] = (start, ts-BDay(1))
+                removed_tickers.add(removed_ticker)
+                all_components.append(removed_ticker)
+
+        if len(all_components) > len(ret):
+            raise ValueError('Some tickers were added twice during the implied period')
+
+        return ret
+
 
 class USStockMarketMetrics(Metrics):
     def __init__(self, tickers, additional_share_classes=None, stock_index='^GSPC', start=None, hist_shares_outs=None):
@@ -818,31 +863,8 @@ class USStockMarketMetrics(Metrics):
         :param start: an int, float, str, datetime, or date object designating the starting time for calculating the
                       history of the constituent components of the S&P 500 Index.
         """
-        if type(start) is date:
-            start = datetime.combine(start, time())
-        start = pd.to_datetime(start)
-        all_components = USStockMarketMetrics.get_sp500_components()[0].copy()
-        ret = {ticker: (start, None) for ticker in all_components}
-        removed_tickers = set()
-
-        df = pd.read_csv('./stock_market/sp500_changes_since_2019.csv', index_col=[0])
-        for idx, row in df[::-1].iterrows():
-            ts = pd.to_datetime(idx)
-            if ts < start:
-                break
-            for added_ticker in [] if pd.isnull(row.iloc[0]) else row.iloc[0].split(','):
-                _, end = ret[added_ticker]
-                ret[added_ticker] = (ts, end)
-
-            for removed_ticker in [] if pd.isnull(row.iloc[1]) else row.iloc[1].split(','):
-                ret[removed_ticker] = (start, ts-BDay(1))
-                removed_tickers.add(removed_ticker)
-                all_components.append(removed_ticker)
-
-        if len(all_components) > len(ret):
-            raise ValueError('Some tickers were added twice during the implied period')
-
-        return ret
+        return Metrics.get_historical_components(USStockMarketMetrics.get_sp500_components()[0],
+                                                 './stock_market/sp500_changes_since_2019.csv', start)
 
     @staticmethod
     def get_sp500_historical_shares_outstanding():
@@ -1069,10 +1091,46 @@ class EuropeBanksStockMarketMetrics(Metrics):
                 'DNB.OL', 'SB1NO.OL',
                 'PEO.WA', 'PKO.WA', 'SPL.WA']
 
+
+class NLStockMarketMetrics(EuropeBanksStockMarketMetrics):
+    def __init__(self, tickers, additional_share_classes=None, stock_index='^AEX', start=None, hist_shares_outs=None,
+                 currency_conversion_df=None):
+        super().__init__(tickers, additional_share_classes, stock_index, start, hist_shares_outs,
+                         currency_conversion_df)
+
     @staticmethod
-    def tickers_to_dict(tickers, st):
-        """
-        Converts a list of ticker symbols into a dictionary whose keys are the same ticker symbols and whose values
-        are (start-date, end-date) pairs indicating since when a particular ticker has been part of the market
-        """
-        return {ticker: (st, None) for ticker in tickers}
+    def get_aex_components():
+        # URL of the AEX index Wikipedia page
+        url = 'https://en.wikipedia.org/wiki/AEX_index'
+        try:
+            # Fetch all tables from the Wikipedia page
+            tables = pd.read_html(url)
+            #print(f"Found {len(tables)} tables on the page")
+        except Exception as e:
+            #print(f"Error fetching tables: {e}")
+            return None
+
+            # Keywords to identify the correct table
+        keywords = ['company', 'sector', 'ticker', 'weight']
+
+        # Iterate through each table
+        for i, df in enumerate(tables):
+            # Check if all column names are strings
+            if not all(isinstance(col, str) for col in df.columns):
+                #print(f"Skipping table {i} due to non-string columns: {df.columns.tolist()}")
+                continue
+
+            # Look for columns matching our keywords (case-insensitive)
+            # print(f"Table {i} columns: {df.columns.tolist()}")
+            matching_cols = [col for col in df.columns if any(keyword in col.lower() for keyword in keywords)]
+
+            # If at least 3 columns match, assume this is the composition table
+            if len(matching_cols) >= 3:
+                return  [component + '.AS' for component in df.loc[:, 'Ticker symbol']]
+
+        return None
+
+    @staticmethod
+    def get_aex_historical_components(start=None):
+        return Metrics.get_historical_components(NLStockMarketMetrics.get_aex_components(),
+            './stock_market/aex_changes_since_2021.csv', start)
