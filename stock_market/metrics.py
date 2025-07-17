@@ -38,10 +38,11 @@ class Metrics:
         Constructs a Metrics object out of a list of ticker symbols and an optional index ticker
 
         :param tickers: a dictionary representing all the ticker symbols making up a stock market that this class
-                        derives metrics for. Each key represents a ticker symbol. Each value designates the start and
-                        end day of the stock represented by the ticker being added or removed. An end value of None
-                        implies it's still part of the market, a start value of None designates it becoming part of
-                        the market before 'start'
+                        derives metrics for. Each key represents a ticker symbol. Each value designates a list of pairs,
+                        each pair representing the dates of inclusion and exclusion from the index during a specific
+                        period (the inclusion period includes the exclusion date). A start date of 'None' in a pair
+                        means the ticker was part of the market before 'start'. An end date of 'None' means
+                        the ticker is still part of the market.
         :param additional_share_classes: a dictionary whose keys are additional share classes of companies
                                          that have multiple share classes and where they all are part of the market,
                                          the values are the first share class (typically class A)
@@ -135,8 +136,8 @@ class Metrics:
 
         # Walk through all tickers that are no longer part of S&P 500 and fill in missing prices (if any) for
         # those that have been delisted
-        for delisted_ticker in [k for (k, (st, ed)) in tickers.items() if ed is not None]:
-            ed = min(tickers[delisted_ticker][1], self.data.index[-1])
+        for delisted_ticker in [k for (k, periods) in tickers.items() if periods[-1][1] is not None]:
+            ed = min(tickers[delisted_ticker][-1][1], self.data.index[-1])
             f = self.data.loc[:, (self.CLOSE, delisted_ticker)]
             st = f.last_valid_index()
             # In case delisting took place before a formal removal from the market, I replicate the last closing price
@@ -245,24 +246,24 @@ class Metrics:
             # df's first column is the closing price and the second is the volume
             df = self.data.loc(axis=1)[:, ticker].droplevel(1, axis=1)
 
-            (st, ed) = self.ticker_symbols[ticker]
-            # Turnover = Closing price x Volume
-            self.capitalization.loc[st:ed, Metrics.TURNOVER]\
-                += df.loc[st:ed,Metrics.CLOSE] * df.loc[st:ed,Metrics.VOLUME]
+            for (st, ed) in self.ticker_symbols[ticker]:
+                # Turnover = Closing price x Volume
+                self.capitalization.loc[st:ed, Metrics.TURNOVER]\
+                    += df.loc[st:ed,Metrics.CLOSE] * df.loc[st:ed,Metrics.VOLUME]
 
-            # Capitalization = Closing price x Shares outstanding.
-            self.capitalization.loc[st:ed, Metrics.CAPITALIZATION]\
-                += df.loc[st:ed,Metrics.CLOSE] * self.shares_outstanding[ticker].loc[st:ed]
-            self.capitalization.loc[st:ed, ticker]\
-                = df.loc[st:ed,Metrics.CLOSE] * self.shares_outstanding[ticker].loc[st:ed]
+                # Capitalization = Closing price x Shares outstanding.
+                self.capitalization.loc[st:ed, Metrics.CAPITALIZATION]\
+                    += df.loc[st:ed,Metrics.CLOSE] * self.shares_outstanding[ticker].loc[st:ed]
+                self.capitalization.loc[st:ed, ticker]\
+                    = df.loc[st:ed,Metrics.CLOSE] * self.shares_outstanding[ticker].loc[st:ed]
 
-            # Most recent forward dividend yield and forward P/E
-            if ticker in self.get_current_components():
-                self.forward_dividend_yield += (df.iloc[:,0] * self.shares_outstanding[ticker]).iloc[-1]\
-                    * self.dividend_yield[ticker]
+                # Most recent forward dividend yield and forward P/E
+                if ticker in self.get_current_components():
+                    self.forward_dividend_yield += (df.iloc[:,0] * self.shares_outstanding[ticker]).iloc[-1]\
+                        * self.dividend_yield[ticker]
 
-                # Calculating forward P/E for the whole market using a capitalization-weighted approach
-                self.forward_PE += self.shares_outstanding[ticker].iloc[-1] * self.eps[ticker]
+                    # Calculating forward P/E for the whole market using a capitalization-weighted approach
+                    self.forward_PE += self.shares_outstanding[ticker].iloc[-1] * self.eps[ticker]
 
         self.forward_dividend_yield /= self.capitalization.iloc[-1,0]
         self.forward_PE = self.capitalization.iloc[-1,0] / self.forward_PE
@@ -303,8 +304,8 @@ class Metrics:
         else:
             ret = pd.Series(0., index=self.data.index)
             for ticker in tickers:
-                (st, ed) = self.ticker_symbols[ticker]
-                ret += self.data.loc[st:ed, (Metrics.CLOSE, ticker)] * self.shares_outstanding[ticker].loc[st:ed]
+                for (st, ed) in self.ticker_symbols[ticker]:
+                    ret += self.data.loc[st:ed, (Metrics.CLOSE, ticker)] * self.shares_outstanding[ticker].loc[st:ed]
             return ret.resample(frequency).mean().dropna()
 
     def adjust_for_additional_share_classes(self, cap_series):
@@ -430,9 +431,9 @@ class Metrics:
         else:
             daily_turnover = pd.Series(0., index=self.data.index)
             for ticker in tickers:
-                (st, ed) = self.ticker_symbols[ticker]
-                daily_turnover += self.data.loc[st:ed, (Metrics.CLOSE, ticker)]\
-                    * self.data.loc[st:ed, (Metrics.VOLUME, ticker)]
+                for (st, ed) in self.ticker_symbols[ticker]:
+                    daily_turnover += self.data.loc[st:ed, (Metrics.CLOSE, ticker)]\
+                        * self.data.loc[st:ed, (Metrics.VOLUME, ticker)]
         return daily_turnover
 
     def get_daily_trading_value(self, frequency='ME', tickers=None):
@@ -468,9 +469,9 @@ class Metrics:
         else:
             capitalization = pd.Series(0., index=self.data.index)
             for ticker in tickers:
-                (st, ed) = self.ticker_symbols[ticker]
-                capitalization += self.data.loc[st:ed, (Metrics.CLOSE, ticker)]\
-                    * self.shares_outstanding[ticker].loc[st:ed]
+                for (st, ed) in self.ticker_symbols[ticker]:
+                    capitalization += self.data.loc[st:ed, (Metrics.CLOSE, ticker)]\
+                        * self.shares_outstanding[ticker].loc[st:ed]
             daily_turnover /= capitalization
 
         return daily_turnover.resample(frequency).mean().dropna()
@@ -521,7 +522,7 @@ class Metrics:
         """
         Returns the current set of components in a given stock market.
         """
-        return [k for k, (st, ed) in self.ticker_symbols.items() if ed is None]
+        return [k for k, periods in self.ticker_symbols.items() if periods[-1][1] is None]
 
     def get_beta(self, tickers, weights=None, years=5, use_adjusted_close=False):
         """
@@ -690,16 +691,7 @@ class Metrics:
         ret = defaultdict(float)
 
         for ticker in self.ticker_symbols.keys():
-            (st, ed) = self.ticker_symbols[ticker]
-            st = pd.Timestamp(st)
-
-            # The company fell out of the market before the day of inquiry
-            if ed is not None and pd.Timestamp(ed) < dt:
-                continue
-            # The company was added to the market after the day of inquiry
-            if st > dt:
-                continue
-
+            if not self.is_ticker_in_market(ticker, dt): continue
             sector_key = self.tickers.tickers[ticker].info.get('sectorKey', Metrics.UNIDENTIFIED_SECTOR)
             ret[sector_key] += self.data.loc[dt, (Metrics.CLOSE, ticker)]\
                                   * self.shares_outstanding[ticker].loc[dt]
@@ -744,46 +736,121 @@ class Metrics:
     def tickers_to_dict(tickers, st):
         """
         Converts a list of ticker symbols into a dictionary whose keys are the same ticker symbols and whose values
-        are (start-date, end-date) pairs indicating since when a particular ticker has been part of the market
+        are lists with one (start-date, end-date) pair indicating since when a particular ticker has been part of
+        the market
         """
-        return {ticker: (st, None) for ticker in tickers}
+        return {ticker: [(st, None)] for ticker in tickers}
+
+    def is_ticker_in_market(self, ticker, dt):
+        """
+        Check if the given ticker is part of the market on the specified date.
+
+        :param ticker: str, the ticker symbol to check
+        :param dt: str, datetime, or Timestamp, the date to check
+        :return: bool, True if the ticker is in the market on the date, False otherwise
+        """
+        # Convert the input date to a pandas Timestamp
+        dt = pd.to_datetime(dt)
+
+        # Check each period
+        for entry, exit in self.ticker_symbols[ticker]:
+            if entry <= dt and (exit is None or dt <= exit):
+                return True
+
+        # No matching period found
+        return False
 
     @staticmethod
     def get_historical_components(cur_components, file_name, start=None):
         """
-        Returns a dictionary whose keys are ticker symbols representing companies that were part of the S&P 500 Index
-        at any time since 'start' and whose values are pairs representing the dates of inclusion and exclusion from
-        the index. A start date of 'None' means the ticker was part of the index before 'start'. An end date of 'None'
-        implies the ticker is still part of the index.
+        Returns a dictionary whose keys are ticker symbols representing companies that were part of a market
+        at any time since 'start' and whose values are lists of pairs, each pair representing the dates of
+        inclusion and exclusion from the index during a specific period (the inclusion period includes
+        the exclusion date). A start date of 'None' in a pair
+        means the ticker was part of the index before 'start'. An end date of 'None' means the ticker is
+        still part of the index.
 
-        :param start: an int, float, str, datetime, or date object designating the starting time for calculating the
-                      history of the constituent components of the S&P 500 Index.
+        :param cur_components: list of current ticker symbols in the market.
+        :param file_name: str, path to the CSV file with historical changes.
+        :param start: an int, float, str, datetime, or date object designating the starting time.
         """
+        from datetime import date
         if type(start) is date:
             start = datetime.combine(start, time())
         start = pd.to_datetime(start)
-        all_components = cur_components.copy()
-        ret = {ticker: (start, None) for ticker in all_components}
-        removed_tickers = set()
+        if pd.isna(start):
+            start = pd.to_datetime('1900-01-01')  # Use an early date if start is None
 
-        df = pd.read_csv(file_name, index_col=[0])
-        for idx, row in df[::-1].iterrows():
-            ts = pd.to_datetime(idx)
-            if ts < start:
-                break
-            for added_ticker in [] if pd.isnull(row.iloc[0]) else row.iloc[0].split(','):
-                _, end = ret[added_ticker]
-                ret[added_ticker] = (ts, end)
+        # Read and filter CSV data
+        df = pd.read_csv(file_name, index_col=0)
+        df.index = pd.to_datetime(df.index)
+        df = df[df.index >= start].sort_index()  # Sort chronologically
 
-            for removed_ticker in [] if pd.isnull(row.iloc[1]) else row.iloc[1].split(','):
-                ret[removed_ticker] = (start, ts-BDay(1))
-                removed_tickers.add(removed_ticker)
-                all_components.append(removed_ticker)
+        # Collect all tickers involved
+        all_tickers = set(cur_components)
+        for _, row in df.iterrows():
+            if not pd.isnull(row.iloc[0]):
+                all_tickers.update(row.iloc[0].split(','))
+            if not pd.isnull(row.iloc[1]):
+                all_tickers.update(row.iloc[1].split(','))
 
-        if len(all_components) > len(ret):
-            raise ValueError('Some tickers were added twice during the implied period')
+        # Initialize periods dictionary
+        periods = {ticker: [] for ticker in all_tickers}
 
-        return ret
+        # Collect events for each ticker
+        events = {ticker: [] for ticker in all_tickers}
+        for date, row in df.iterrows():
+            if not pd.isnull(row.iloc[0]):  # Process additions
+                for ticker in row.iloc[0].split(','):
+                    if ticker in all_tickers:
+                        events[ticker].append((date, 'add'))
+            if not pd.isnull(row.iloc[1]):  # Process removals
+                for ticker in row.iloc[1].split(','):
+                    if ticker in all_tickers:
+                        events[ticker].append((date, 'remove'))
+
+        # Sort events chronologically for each ticker
+        for ticker in events:
+            events[ticker].sort(key=lambda x: x[0])
+
+        # Build periods for each ticker
+        for ticker in all_tickers:
+            ticker_events = events[ticker]
+            if not ticker_events:  # No events since start
+                if ticker in cur_components:
+                    periods[ticker].append((start, None))
+                continue
+
+            # If first event is 'remove', ticker was in index at start
+            if ticker_events[0][1] == 'remove':
+                remove_date = ticker_events[0][0]
+                periods[ticker].append((start, remove_date - BDay(1)))
+                start_idx = 1
+            else:
+                start_idx = 0
+
+            # Process subsequent events in pairs
+            i = start_idx
+            while i < len(ticker_events):
+                if ticker_events[i][1] == 'add':
+                    add_date = ticker_events[i][0]
+                    i += 1
+                    if i < len(ticker_events) and ticker_events[i][1] == 'remove':
+                        remove_date = ticker_events[i][0]
+                        periods[ticker].append((add_date, remove_date - BDay(1)))
+                        i += 1
+                    else:
+                        # No subsequent 'remove'
+                        if ticker in cur_components:
+                            periods[ticker].append((add_date, None))
+                        else:
+                            raise ValueError(
+                                f"Ticker {ticker} has an 'add' without a 'remove' but is not in cur_components")
+                else:
+                    # Unexpected 'remove' without preceding 'add'
+                    i += 1  # Skip to next event
+
+        return periods
 
 
 class USStockMarketMetrics(Metrics):
