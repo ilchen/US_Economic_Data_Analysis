@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from pandas.tseries.offsets import YearBegin, BDay, MonthBegin
+from pandas.tseries.offsets import YearBegin, BYearEnd, BDay, BMonthEnd, MonthBegin
 import pandas_datareader.data as web
 from math import sqrt, isclose
 from collections import defaultdict
@@ -288,40 +288,54 @@ class Metrics:
             additional_share_classes = {}
         self.additional_share_classes = additional_share_classes
 
-    def get_capitalization(self, frequency='ME', tickers=None):
+    @staticmethod
+    def validate_method(method):
+        allowed_methods = {'mean', 'first', 'last', 'min', 'max'}
+        if method not in allowed_methods:
+            raise ValueError(f"Method '{method}' not supported. Choose from: {', '.join(allowed_methods)}")
+
+    def get_capitalization(self, frequency='ME', method='mean', tickers=None):
         """
-        Calculates the capitalization of a given market or a subset of stocks over time. Downsamples if a less
-        granular frequency than daily is specified. Takes an average capitalization over periods implied by
-        the 'frequency' parameter.
+        Calculates the capitalization of a given market or a subset of stocks over time.
+        If a frequency less granular than daily is provided, the data is downsampled accordingly.
+        For the 'mean' method, the result is the average capitalization over each period.
+        For other supported methods ('first', 'last', 'min', 'max'), the capitalization is derived
+        from the respective day or value within each period.
 
         :param frequency: a standard Pandas frequency designator
             https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#timeseries-offset-aliases
+        :param method: aggregation strategy applied during resampling, one of 'mean', 'first', 'last', 'min', 'max'
         :param tickers: a list of one or more ticker symbols
         :returns: a pd.Series object capturing the capitalization of the market
         """
+        self.validate_method(method)
         if tickers is None:
-            return self.capitalization.loc[:, Metrics.CAPITALIZATION].resample(frequency).mean().dropna()
+            return self.capitalization.loc[:, Metrics.CAPITALIZATION].resample(frequency).agg(method).dropna()
         else:
             ret = pd.Series(0., index=self.data.index)
             for ticker in tickers:
                 for (st, ed) in self.ticker_symbols[ticker]:
                     ret += self.data.loc[st:ed, (Metrics.CLOSE, ticker)] * self.shares_outstanding[ticker].loc[st:ed]
-            return ret.resample(frequency).mean().dropna()
+            return ret if frequency in ['B', 'D', 'C'] else ret.resample(frequency).agg(method).dropna()
 
     def adjust_for_additional_share_classes(self, cap_series):
         for additional_share_class, main_share_class in self.additional_share_classes.items():
             cap_series.loc[main_share_class] += cap_series.loc[additional_share_class]
             cap_series.drop(additional_share_class, inplace=True)
 
-    def get_capitalization_for_companies(self, tickers, frequency='ME', merge_additional_share_classes=True):
+    def get_capitalization_for_companies(self, tickers, frequency='ME', method='mean',
+                                         merge_additional_share_classes=True):
         """
         Calculates the capitalization of stocks represented by the 'tickers' parameter.
-        Downsamples if a less granular frequency than daily is specified. Takes an average capitalization over periods
-        implied by the 'frequency' parameter when doing so.
+        If a frequency less granular than daily is provided, the data is downsampled accordingly.
+        For the 'mean' method, the result is the average capitalization over each period.
+        For other supported methods ('first', 'last', 'min', 'max'), the capitalization is derived
+        from the respective day or value within each period.
 
         :param tickers: a list of one or more ticker symbols
         :param frequency: a standard Pandas frequency designator
             https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#timeseries-offset-aliases
+        :param method: aggregation strategy applied during resampling, one of 'mean', 'first', 'last', 'min', 'max'
         :param merge_additional_share_classes: for companies that have multiple share classes listed (e.g. Google),
                                                indicates whether to merge the capitalization of different share classes
                                                into one
@@ -331,6 +345,7 @@ class Metrics:
             raise ValueError("Ticker symbols passed don't represent a subset of the market. "
                              'The following ticker symbols are not part of the market: '
                              f'{set(tickers) - self.ticker_symbols.keys()}')
+        self.validate_method(method)
         cap_df = self.capitalization.loc[:, [self.CAPITALIZATION] + tickers]
         if merge_additional_share_classes and len(self.additional_share_classes) > 0\
                 and set(tickers) & self.additional_share_classes.keys():
@@ -339,7 +354,7 @@ class Metrics:
                 if additional_share_class in tickers and main_share_class in tickers:
                     cap_df.loc[:, main_share_class] += cap_df.loc[:, additional_share_class]
                     cap_df.drop(additional_share_class, axis=1, inplace=True)
-        return cap_df.resample(frequency).mean().dropna()
+        return cap_df.resample(frequency).agg(method).dropna()
 
     def get_top_n_capitalization_companies_for_day(self, n, dt=None, merge_additional_share_classes=True):
         """
@@ -373,13 +388,15 @@ class Metrics:
 
         return topn
 
-    def get_top_n_capitalization_companies_for_month(self, n, dt=None, merge_additional_share_classes=True):
+    def get_top_n_capitalization_companies_for_month(self, n, dt=None, method='mean',
+                                                     merge_additional_share_classes=True):
         """
         Calculates the top-n capitalization companies for the market taking the average for the month specified.
 
         :param n: the number of maximum capitalization companies to return
         :param dt: (string, int, date, datetime, Timestamp) – the date for whose month to return the topn capitalization
                     if None, the most recent business day is used
+        :param method: aggregation strategy applied during resampling, one of 'mean', 'first', 'last', 'min', 'max'
         :param merge_additional_share_classes: for companies that have multiple share classes listed (e.g. Google),
                                                indicates whether to merge the capitalization of different share classes
                                                into one
@@ -387,11 +404,12 @@ class Metrics:
                   percentage share of their capitalization in the market. The pd.Series is indexed by the ticker
                   symbols.
         """
+        self.validate_method(method)
         if dt is None:
             dt = self.data.index[-1]
         dt = MonthBegin(0).rollback(dt) if MonthBegin(0).rollback(dt) <= self.data.index[-1]\
             else MonthBegin(0).rollback(self.data.index[-1])
-        resampled_cap = self.capitalization.resample('MS').mean()
+        resampled_cap = self.capitalization.resample('MS').agg(method)
         cap_series = resampled_cap.loc[dt, resampled_cap.columns[2:]]
         if merge_additional_share_classes and len(self.additional_share_classes) > 0:
             self.adjust_for_additional_share_classes(cap_series)
@@ -399,13 +417,15 @@ class Metrics:
         topn[self.MKT_SHARE] = topn.iloc[:, 0] / resampled_cap.loc[dt, self.CAPITALIZATION]
         return topn
 
-    def get_top_n_capitalization_companies_for_year(self, n, dt=None, merge_additional_share_classes=True):
+    def get_top_n_capitalization_companies_for_year(self, n, dt=None, method='mean',
+                                                    merge_additional_share_classes=True):
         """
         Calculates the top-n capitalization companies for the market taking the average for the year specified.
 
         :param n: the number of maximum capitalization companies to return
         :param dt: (string, int, date, datetime, Timestamp) – the date for whose year to return the topn capitalization
                     if None, the current year is used
+        :param method: aggregation strategy applied during resampling, one of 'mean', 'first', 'last', 'min', 'max'
         :param merge_additional_share_classes: for companies that have multiple share classes listed (e.g. Google),
                                                indicates whether to merge the capitalization of different share classes
                                                into one
@@ -413,11 +433,12 @@ class Metrics:
                   percentage share of their capitalization in the market. The pd.Series is indexed by the ticker
                   symbols.
         """
+        self.validate_method(method)
         if dt is None:
             dt = self.data.index[-1]
         dt = YearBegin(0).rollback(dt) if YearBegin(0).rollback(dt) <= self.data.index[-1]\
             else YearBegin(0).rollback(self.data.index[-1])
-        resampled_cap = self.capitalization.resample('YS').mean()
+        resampled_cap = self.capitalization.resample('YS').agg(method)
         cap_series = resampled_cap.loc[dt, resampled_cap.columns[2:]]
         if merge_additional_share_classes and len(self.additional_share_classes) > 0:
             self.adjust_for_additional_share_classes(cap_series)
@@ -439,8 +460,8 @@ class Metrics:
     def get_daily_trading_value(self, frequency='ME', tickers=None):
         """
         Calculates a total daily trading value of stocks in the market implied by this object.
-        Downsamples if a less granular frequency than daily is specified. Takes an average turnover over periods
-        implied by the 'frequency' parameter.
+        Downsamples if a less granular frequency than daily is specified. Takes a cumulative turnover over periods
+        implied by the 'frequency' parameter and then annualizes it.
 
         :param frequency: a standard Pandas frequency designator
             https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#timeseries-offset-aliases
@@ -450,7 +471,36 @@ class Metrics:
         return self.get_daily_trading_value_ds(tickers).resample(frequency).mean().dropna().rename(self.TOTAL_VALUE)
 
     def get_annual_trading_value(self, frequency='ME', tickers=None):
-        return self.get_daily_trading_value(frequency, tickers) * self.TRADING_DAYS_IN_YEAR
+        """
+        Calculates the annual trading value of stocks based on resampled daily trading data.
+
+        The method resamples daily trading values to the specified frequency, computing an annualized total.
+        For monthly-like frequencies ('ME', 'MS', 'BMS', 'BME'), it sums the monthly averages and multiplies by 12.
+        For year-end frequencies ('YS', 'YE', 'BYS', 'BYE'), it directly sums the yearly values.
+        If the final period does not cover a complete month or year, the method estimates the last value
+        using the most recent average trading activity.
+
+        :param frequency: Pandas offset alias indicating the desired resampling frequency
+            (e.g., 'ME' for month-end, 'YE' for year-end).
+            See: https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#timeseries-offset-aliases
+        :param tickers: Optional list of ticker symbols to filter daily trading value calculations.
+        :returns: pd.Series of annualized trading value per period at the specified frequency.
+        """
+        tmp = self.get_daily_trading_value_ds(tickers)
+        ret = tmp.resample(frequency).mean().dropna().rename(self.TOTAL_VALUE) * self.TRADING_DAYS_IN_YEAR
+        if frequency in ['ME', 'MS', 'BMS', 'BME']:
+            ret2 = tmp.resample(frequency).sum().rename(self.TOTAL_VALUE) * 12
+            # In case it's not a full month, use an estimate from daily value traded
+            if tmp.index[-1] < tmp.index[-1] + BMonthEnd(0):
+                ret2.iloc[-1] = ret.iloc[-1]
+            return ret2
+        elif frequency in ['YS', 'YE', 'BYS', 'BYE']:
+            ret2 = tmp.resample(frequency).sum().rename(self.TOTAL_VALUE)
+            # In case it's not a full year, use an estimate from daily value traded
+            if tmp.index[-1] < tmp.index[-1] + BYearEnd(0):
+                ret2.iloc[-1] = ret.iloc[-1]
+            return ret2
+        return ret
 
     def get_daily_turnover(self, frequency='ME', tickers=None):
         """
@@ -464,29 +514,31 @@ class Metrics:
         :returns: a pd.Series object capturing the turnover
         """
         daily_turnover = self.get_daily_trading_value_ds(tickers)
-        if tickers is None:
-            daily_turnover /= self.capitalization.loc[:, Metrics.CAPITALIZATION]
-        else:
-            capitalization = pd.Series(0., index=self.data.index)
-            for ticker in tickers:
-                for (st, ed) in self.ticker_symbols[ticker]:
-                    capitalization += self.data.loc[st:ed, (Metrics.CLOSE, ticker)]\
-                        * self.shares_outstanding[ticker].loc[st:ed]
-            daily_turnover /= capitalization
-
+        daily_turnover /= self.get_capitalization('B', tickers=tickers) if tickers\
+            else self.capitalization.loc[:, Metrics.CAPITALIZATION]
         return daily_turnover.resample(frequency).mean().dropna()
 
-    def get_annual_turnover(self, frequency='ME', tickers=None):
+    def get_annual_turnover(self, frequency='ME', method='mean', tickers=None):
         """
         Calculates an annual turnover ratio of stocks in the market implied by this object to its capitalization.
-        Downsamples if a less granular frequency than daily is specified. Takes an average turnover over periods
-        implied by the 'frequency' parameter.
+        If a frequency less granular than daily is specified, data is downsampled accordingly.
+        The annual trading value is divided by capitalization resampled to the target frequency and
+        aggregated using the specified method.
 
         :param frequency: a standard Pandas frequency designator
             https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#timeseries-offset-aliases
+        :param method: aggregation strategy applied during resampling, one of 'mean', 'first', 'last', 'min', 'max'
         :param tickers: a list of one or more ticker symbols
         :returns: a pd.Series object capturing the turnover
         """
+        self.validate_method(method)
+        if frequency in ['ME', 'MS', 'BMS', 'BME', 'YS', 'YE', 'BYS', 'BYE']:
+            ret = self.get_annual_trading_value(frequency, tickers)
+            if tickers is None:
+                ret /= self.capitalization.loc[:, Metrics.CAPITALIZATION].resample(frequency).agg(method)
+            else:
+                ret /= self.get_capitalization('B', tickers=tickers).resample(frequency).agg(method)
+            return ret
         return self.get_daily_turnover(frequency, tickers) * self.TRADING_DAYS_IN_YEAR
 
     def get_annual_volatility(self, alpha=1-.94453, frequency='ME', include_next_month=False):
