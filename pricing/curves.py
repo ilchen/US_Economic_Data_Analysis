@@ -181,19 +181,30 @@ class YieldCurve:
         assert self.timestamps[0] <= timestamp <= self.timestamps[-1]
         return self.ppoly(timestamp).tolist()
 
-    def get_curve_points(self, n):
+    def get_curve_points(self, n, compounding_freq=None):
         """
         Returns a Series object corresponding to this yield curve's points evenly spaced,
         indexed by datatime.date values represented as a DatetimeIndex.
 
         :param n: the number of points to return, must be >= 2
+        :param compounding_freq: desired compounding frequency of returned rates, if None, the
+                           compounding frequency used when constructing this objecy is used.
         """
-        assert n >= 2
+        if n < 2:
+            raise ValueError('Requested number of curve points must be greater than 1')
         delta = (self.timestamps[-1] - self.timestamps[0]) / (n - 1)
         timestamps = [self.timestamps[0] + i * delta for i in range(n)]
         pairs = list(zip(*[(date.fromtimestamp(timestamp), self.ppoly(timestamp).tolist())
                            for timestamp in timestamps]))
-        return pd.Series(pairs[1], index=pd.DatetimeIndex(pairs[0]), name=str(self.date))
+        ret = pd.Series(pairs[1], index=pd.DatetimeIndex(pairs[0]), name=str(self.date))
+        if compounding_freq is not None and compounding_freq != self.comp_freq:
+            if self.comp_freq == 0:
+                ret = (np.power(np.exp(ret), 1 / compounding_freq) - 1) * compounding_freq
+            elif compounding_freq == 0:
+                ret = np.log(np.power(1 + ret / self.comp_freq, self.comp_freq))
+            else:
+                ret = (np.power(1 + ret / self.comp_freq, self.comp_freq / compounding_freq) - 1) * compounding_freq
+        return ret
 
     def get_curve_points_indexed_by_maturities(self, n, maturity_repr=MaturityRepresentation.PANDAS_TIMEDELTA):
         """
