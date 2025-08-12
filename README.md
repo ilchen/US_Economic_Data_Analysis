@@ -1,24 +1,24 @@
 # US Economic Data Analysis
-This repository contains Jupyter notebooks that visually analyze US Economic data as provided by [St. Louis Fed](https://fred.stlouisfed.org), the [OECD](https://stats.oecd.org), and [Yahoo-Finance](https://finance.yahoo.com/). The analysis is carried out using [Pandas](https://pandas.pydata.org), [Pandas datareader](https://pydata.github.io/pandas-datareader/), and [Matplotlib](https://matplotlib.org/stable/index.html).
+This repository contains Jupyter notebooks that visually analyze US Economic data as provided by [St. Louis Fed](https://fred.stlouisfed.org), the [OECD](https://stats.oecd.org), and [Yahoo-Finance](https://finance.yahoo.com/). The analysis is carried out using [Pandas](https://pandas.pydata.org), [Matplotlib](https://matplotlib.org/stable/index.html) and a combination of [Pandas datareader](https://pydata.github.io/pandas-datareader/), [SDMX](https://sdmx1.readthedocs.io/en/latest/), and [yfinance](https://pypi.org/project/yfinance/) libraries for data retrieval via APIs.
 
 So far I created the following notebooks (following a given link lets you see the most recent run of its notebook, I aim to refresh results monthly):
-* [Analysis of CPI, Fed Funds Rate, Treasury rates and Inflation expectations](./CPI_and_Fed_Funds_Rates.ipynb), plus [a similar analysis for the Eurozone by way of comparison](./HICP_and_ECB_Rates.ipynb)
+* [Analysis of CPI, Fed Funds Rate, Treasury rates and Inflation expectations](./CPI_and_Fed_Funds_Rates.ipynb), plus [a similar analysis for the Eurozone by way of comparison](https://github.com/ilchen/EU_Economic_Data_Analysis/blob/main/HICP_and_ECB_Rates.ipynb)
 * [Analysis of the evolution of the US Federal Public Debt](./Fed_Public_Debt_and_Fed_Tax_Revenue.ipynb)
 * [Analysis of the evolution of the ownership structure of US Federal Debt](./Fed_Public_Debt_Holders.ipynb)
 * [Analysis of changes in M2, Real Personal Consumption Expenditures (PCE), Wage Inflation and CPI](./M2_PCE_and_CPI.ipynb)
-* [Analysis of Participation, Employment, Unemployment, Job-vacancy, and Unfilled Vacancies to Population Rates](./Unemployment_and_Participation_Rates.ipynb), plus [a similar analysis for the Eurozone by way of comparison](./Unemployment_and_Participation_Rates_Eurozone.ipynb)
-* [Analysis of US Money Supply](./Money_Supply.ipynb), plus [a similar analysis for the Eurozone by way of comparison](./Money_Supply_Eurozone.ipynb)
+* [Analysis of Participation, Employment, Unemployment, Job-vacancy, and Unfilled Vacancies to Population Rates](./Unemployment_and_Participation_Rates.ipynb), plus [a similar analysis for the Eurozone by way of comparison](https://github.com/ilchen/EU_Economic_Data_Analysis/blob/main/Unemployment_and_Participation_Rates_Eurozone.ipynb)
+* [Analysis of US Money Supply](./Money_Supply.ipynb), plus [a similar analysis for the Eurozone by way of comparison](https://github.com/ilchen/EU_Economic_Data_Analysis/blob/main/Money_Supply_Eurozone.ipynb)
 * [Analysis of Quantitative Easing and Tapering by the Federal Reserve](./Quantitative_Easing_and_Tapering.ipynb)
 * [Analysis of US Treasury Yields' Spreads](./Interest_Rate_Spreads.ipynb) 
-* [Analysis of US Past, Current, and Future Riskfree Rates](./Current_Riskfree_Rates.ipynb), plus [a similar analysis for the Eurozone](./Current_Riskfree_Rates_Eurozone.ipynb)
+* [Analysis of US Past, Current, and Future Riskfree Rates](./Current_Riskfree_Rates.ipynb), plus [a similar analysis for the Eurozone](https://github.com/ilchen/EU_Economic_Data_Analysis/blob/main/Current_Riskfree_Rates_Eurozone.ipynb)
 * [Analysis of US Industrial Production](./Industrial_Production.ipynb)
-* [Analysis of US GDP, its composition by industry, and trends in its make-up](./GDP_Composition.ipynb), plus [a similar analysis for the Eurozone](./GDP_Composition_Eurozone.ipynb)
+* [Analysis of US GDP, its composition by industry, and trends in its make-up](./GDP_Composition.ipynb), plus [a similar analysis for the Eurozone](https://github.com/ilchen/EU_Economic_Data_Analysis/blob/main/GDP_Composition_Eurozone.ipynb)
 * [Analysis of US Labor productivity (incl. comparison with that in EU)](./Labor_Productivity.ipynb)
-* [Analysis of disposable income and savings rates of US individuals](./Disposable_Income_and_Savings.ipynb), plus [a similar analysis for the Eurozone](./Disposable_Income_and_Savings_Eurozone.ipynb)
-* [Analysis of US Stock Market, including various metrics on the S&P 500 Index](./Stock_Market.ipynb), plus [a similar analysus for Stoxx Europe 600 Banks Index](./Stock_Market_Stoxx_Europe_Banks.ipynb)
+* [Analysis of disposable income and savings rates of US individuals](./Disposable_Income_and_Savings.ipynb), plus [a similar analysis for the Eurozone](https://github.com/ilchen/EU_Economic_Data_Analysis/blob/main/Disposable_Income_and_Savings_Eurozone.ipynbb)
+* [Analysis of US Stock Market, including various metrics on the S&P 500 Index](./Stock_Market.ipynb), plus [a similar analysis for Stoxx Europe 600 Banks Index](https://github.com/ilchen/EU_Economic_Data_Analysis/blob/main/Stock_Market_Stoxx_Europe_Banks.ipynb)
 
 ## Requirements
-You'll need python3 and pip. `brew install python` will do if you are on MacOS. You can even forgo installing anything and run these notebooks in Google cloud, as I outline below.
+You'll need python3 and pip. `brew install python` will do if you are on macOS. You can even forgo installing anything and run these notebooks in Google cloud, as I outline below.
 
 In case you opt for a local installation, the rest of the dependencies can be installed as follows:
 ```commandline
