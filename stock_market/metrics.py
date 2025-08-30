@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from pandas.tseries.offsets import YearBegin, BYearEnd, BDay, BMonthEnd, MonthBegin
+from pandas.tseries.offsets import YearBegin, BYearEnd, BDay, BMonthEnd, MonthBegin, QuarterEnd
 import pandas_datareader.data as web
 from math import sqrt, isclose
 from collections import defaultdict
@@ -294,6 +294,12 @@ class Metrics:
         if method not in allowed_methods:
             raise ValueError(f"Method '{method}' not supported. Choose from: {', '.join(allowed_methods)}")
 
+    def validate_tickers_in_market(self, tickers):
+        if tickers is None or not set(tickers) <= self.ticker_symbols.keys():
+            raise ValueError("Ticker symbols passed don't represent a subset of the market. "
+                             'The following ticker symbols are not part of the market: '
+                             f'{set(tickers) - self.ticker_symbols.keys()}')
+
     def get_capitalization(self, frequency='ME', method='mean', tickers=None):
         """
         Calculates the capitalization of a given market or a subset of stocks over time.
@@ -341,10 +347,7 @@ class Metrics:
                                                into one
         :returns: a pd.DataFrame object capturing the capitalization of the companies represented by the 'tickers' parameter
         """
-        if tickers is None or not set(tickers) <= self.ticker_symbols.keys():
-            raise ValueError("Ticker symbols passed don't represent a subset of the market. "
-                             'The following ticker symbols are not part of the market: '
-                             f'{set(tickers) - self.ticker_symbols.keys()}')
+        self.validate_tickers_in_market(tickers)
         self.validate_method(method)
         cap_df = self.capitalization.loc[:, [self.CAPITALIZATION] + tickers]
         if merge_additional_share_classes and len(self.additional_share_classes) > 0\
@@ -904,6 +907,127 @@ class Metrics:
 
         return periods
 
+    def get_quarterly_stmt_data(self, quarters=5, currency_conversion_df=None, tickers=None):
+        """
+        Calculates a cumulative value of a subset of quarterly income and cashflow statements' lines for all companies
+        making up the market represented by this object.
+
+        :param quarters: Number of trailing quarters to include in the aggregation
+        :param currency_conversion_df: for heterogeneous markets made up of stocks priced in different currencies,
+                       a DataFrame whose columns are suffixes such as '.L', '.SW', '.CO', etc. and whose
+                       rows are the corresponding conversion rates.
+        :param tickers: a list of one or more ticker symbols, if None the whole market implied by this object
+                        is analyzed
+        :returns: Tuple[pd.DataFrame, Dict[str, pd.DataFrame]]:
+        - The first DataFrame contains market-wide cumulative values.
+        - The second maps sector keys to their respective cumulative DataFrames.
+        """
+        if tickers:
+            self.validate_tickers_in_market(tickers)
+        last_qe = QuarterEnd(0).rollback(date.today())
+        first_qe = QuarterEnd(0).rollback(max(self.data.index[0], last_qe - pd.DateOffset(months=(quarters-1)*3)))
+
+        # Unfortunately 'Operating Income', 'Interest Expense', 'EBITDA', 'EBIT' are too frequently missing
+        # => not worthwhile adding them
+        # From cashflow statements only taking 'Capital Expenditure' and  'Cash Dividends Paid'
+        idx = pd.Index(['Total Revenue', 'Pretax Income', 'Net Income', 'Tax Provision',
+                        'Capital Expenditure', 'Purchase Of Business', 'Cash Dividends Paid'])
+        idx_istmt = idx[0:4]
+        df_factory = lambda: pd.DataFrame(0., index=idx, columns=pd.date_range(first_qe, last_qe, freq='QE')[::-1])
+        result = df_factory()
+        result_sectors = defaultdict(df_factory)
+        for ticker in self.ticker_symbols.keys() if not tickers else tickers:
+            if ticker in self.additional_share_classes:
+                print(f'Ignoring additional share class for {ticker} to avoid double counting')
+                continue
+
+            # Only looking at the last period of being part of the market
+            (st, ed) = self.ticker_symbols[ticker][-1]
+            st = pd.Timestamp(st)
+
+            # The company fell out of the market before the start of the timeframe under analysis
+            if ed is not None and pd.Timestamp(ed) < first_qe:
+                continue
+
+            # To ensure we are able to compare 'ed' with Timestamps
+            if ed is None:
+                ed = last_qe
+            else:
+                ed = pd.Timestamp(ed)
+
+            istmt = self.tickers.tickers[ticker].quarterly_income_stmt
+            cfstmt = self.tickers.tickers[ticker].quarterly_cash_flow
+
+            if len(istmt.columns) == 0:
+                print(f"Yahoo Finance doesn't have income statement for {ticker} for the following quarters")
+                print(result.columns[(result.columns >= st) & (result.columns <= ed)])
+                continue
+
+            if len(cfstmt.columns) == 0:
+                print(f"Yahoo Finance doesn't have cashflow statement for {ticker} for the following quarters")
+                print(result.columns[(result.columns >= st) & (result.columns <= ed)])
+
+            # Currency conversion if required
+            sfx = self.get_exchange_suffix(ticker)
+            if currency_conversion_df is not None and sfx in currency_conversion_df.columns:
+                convs = currency_conversion_df.loc[istmt.columns, sfx]
+                istmt *= convs
+
+                if len(cfstmt.columns) != 0:
+                    convs = currency_conversion_df.loc[cfstmt.columns, sfx]
+                    cfstmt *= convs
+
+            # Make sure we align on calendar quarter end for those companies whose financial quarters
+            # are not calendar-aligned
+            istmt = istmt.rename(QuarterEnd(0).rollforward, axis=1)
+            cfstmt = cfstmt.rename(QuarterEnd(0).rollforward, axis=1)
+
+            # Remove duplicate columns due to data quality issues
+            istmt = istmt.loc[:, ~istmt.columns.duplicated()]
+            cfstmt = cfstmt.loc[:, ~cfstmt.columns.duplicated()]
+
+            if istmt.columns[0] > last_qe and (result.columns[4] not in istmt.columns
+                                               or (istmt.loc[idx_istmt, result.columns[4]]).isna().all()):
+                print(f'Need to provide values for {ticker} for {result.columns[4]:%Y-%m-%d}')
+
+            if istmt.columns[0] < last_qe <= ed:
+                print(f'Need to provide values for {ticker} for {last_qe:%Y-%m-%d}')
+
+            istmt = istmt.loc[:, last_qe:].astype('float64')
+            cfstmt = cfstmt.loc[:, last_qe:].astype('float64')
+
+            # Make sure that we trim to the end of the last calendar quarter
+            common_quarters = result.columns.intersection(istmt.columns)
+            if len(cfstmt.columns) != 0:
+                common_quarters = common_quarters.intersection(cfstmt.columns)
+            common_idx = istmt.index.intersection(idx)
+            common_idx_cf = cfstmt.index.intersection(idx)
+
+            # Adjusting for when the company's stock was part of the market
+            common_quarters = common_quarters[(common_quarters >= st) & (common_quarters <= ed)]
+            if len(common_quarters) == 0:
+                # The stock wasn't part of the market during the timeframe under analysis
+                continue
+
+            if len(common_idx) < len(idx_istmt):
+                print(f'For {ticker} missing the following income statement lines:')
+                print(idx_istmt.difference(common_idx))
+            if istmt.loc[common_idx, common_quarters].loc[:, common_quarters[0]].isna().any():
+                print(f'Missing {common_quarters[0]:%Y-%m-%d} quarter data for {ticker}'
+                      ' for the following income statement lines:')
+                print(common_idx[istmt.loc[common_idx, common_quarters].loc[:, common_quarters[0]].isna()])
+
+            sector_key = self.tickers.tickers[ticker].info.get('sectorKey', Metrics.UNIDENTIFIED_SECTOR)
+            istmt_values = istmt.loc[common_idx, common_quarters].fillna(0.)
+            result.loc[common_idx, common_quarters] += istmt_values
+            result_sectors[sector_key].loc[common_idx, common_quarters] += istmt_values
+            if len(cfstmt.columns) != 0:
+                cfstmt_values = cfstmt.loc[common_idx_cf, common_quarters].fillna(0.)
+                result.loc[common_idx_cf, common_quarters] += cfstmt_values
+                result_sectors[sector_key].loc[common_idx_cf, common_quarters] += cfstmt_values
+
+        return result, result_sectors
+
 
 class USStockMarketMetrics(Metrics):
     def __init__(self, tickers, additional_share_classes=None, stock_index='^GSPC', start=None, hist_shares_outs=None):
@@ -953,7 +1077,12 @@ class USStockMarketMetrics(Metrics):
         share classes as part of the index, the keys are additional shares ticker symbols and values
         are the first share class (typically class A). Three corporations in the index have class B or class C shares.
         """
-        table = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+                          '(KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        table = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies',
+                             storage_options=headers)
         df = table[0]
         # Correction for Yahoo-Finance's representation of Class B shares
         sp500_components = [ticker.replace('.', '-') for ticker in df['Symbol'].to_list()]
