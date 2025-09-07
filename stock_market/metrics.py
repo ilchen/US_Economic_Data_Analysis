@@ -357,7 +357,7 @@ class Metrics:
                 if additional_share_class in tickers and main_share_class in tickers:
                     cap_df.loc[:, main_share_class] += cap_df.loc[:, additional_share_class]
                     cap_df.drop(additional_share_class, axis=1, inplace=True)
-        return cap_df if frequency in ['B', 'D', 'C'] else cap_df.resample(frequency).agg(method).dropna()
+        return cap_df if frequency in ['B', 'D', 'C'] else cap_df.resample(frequency).agg(method)
 
     def get_top_n_capitalization_companies_for_day(self, n, dt=None, merge_additional_share_classes=True):
         """
