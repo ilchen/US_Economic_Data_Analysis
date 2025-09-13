@@ -32,6 +32,11 @@ class Metrics:
     UNIDENTIFIED_SECTOR = 'unidentified'
     BANKING_INDUSTRIES = {'capital-markets', 'banks-diversified', 'banks-regional'}
 
+    WIKIPEDIA_HEADERS = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+                      '(KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
+
     def __init__(self, tickers, additional_share_classes=None, stock_index=None, start=None, hist_shares_outs=None,
                  tickers_to_correct_for_splits=None, currency_conversion_df=None):
         """
@@ -1077,12 +1082,8 @@ class USStockMarketMetrics(Metrics):
         share classes as part of the index, the keys are additional shares ticker symbols and values
         are the first share class (typically class A). Three corporations in the index have class B or class C shares.
         """
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-                          '(KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
         table = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies',
-                             storage_options=headers)
+                             storage_options=Metrics.WIKIPEDIA_HEADERS)
         df = table[0]
         # Correction for Yahoo-Finance's representation of Class B shares
         sp500_components = [ticker.replace('.', '-') for ticker in df['Symbol'].to_list()]
@@ -1373,7 +1374,7 @@ class NLStockMarketMetrics(EuropeBanksStockMarketMetrics):
         url = 'https://en.wikipedia.org/wiki/AEX_index'
         try:
             # Fetch all tables from the Wikipedia page
-            tables = pd.read_html(url)
+            tables = pd.read_html(url, storage_options=Metrics.WIKIPEDIA_HEADERS)
             #print(f"Found {len(tables)} tables on the page")
         except Exception as e:
             #print(f"Error fetching tables: {e}")
