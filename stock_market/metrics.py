@@ -200,10 +200,9 @@ class Metrics:
                 # Correction for the shares outstanding for companies that have multiple classes of shares that
                 # are listed, e.g. Alphabet's Class A 'GOOGL' and Class C 'GOOG' stocks or 'BRK-A' and 'BRK-B'
                 shares_outstanding = self.tickers.tickers[ticker].info.get('sharesOutstanding')
-                if shares_outstanding is not None and shares_outstanding * 1.2 < shares_outst.iloc[-1].item():
-                    shares_outstanding2 = self.tickers.tickers[ticker].info.get('impliedSharesOutstanding')
-                    if not shares_outstanding2:
-                        shares_outstanding2 = shares_outst.iloc[-1].item()
+                if shares_outstanding and shares_outstanding * 1.2 < shares_outst.iloc[-1].item():
+                    shares_outstanding2 = self.tickers.tickers[ticker].info.get('impliedSharesOutstanding')\
+                                          or shares_outst.iloc[-1].item()
                     print('Correcting the number of shares outstanding for {:s} from {:d} to {:d}'
                           .format(ticker, shares_outst.iloc[-1].item(),
                                   int(shares_outst.iloc[-1].item() * shares_outstanding / shares_outstanding2)))
@@ -753,8 +752,7 @@ class Metrics:
         for ticker in self.ticker_symbols.keys():
             if not self.is_ticker_in_market(ticker, dt): continue
             sector_key = self.tickers.tickers[ticker].info.get('sectorKey', Metrics.UNIDENTIFIED_SECTOR)
-            ret[sector_key] += self.data.loc[dt, (Metrics.CLOSE, ticker)]\
-                                  * self.shares_outstanding[ticker].loc[dt]
+            ret[sector_key] += self.capitalization.loc[dt, ticker]
 
         return pd.Series(ret) / self.capitalization.loc[dt, Metrics.CAPITALIZATION]
 
@@ -1417,7 +1415,9 @@ class NLStockMarketMetrics(EuropeBanksStockMarketMetrics):
 
             # If at least 3 columns match, assume this is the composition table
             if len(matching_cols) >= 3:
-                return  [component + '.AS' for component in df.loc[:, 'Ticker symbol']]
+                # Since Wikipedia doesn't yet reflect the extension of the index to 30 components, adjustimg manually
+                return  [component + '.AS' for component in df.loc[:, 'Ticker symbol']]\
+                         + ['CVC.AS', 'INPST.AS', 'JDEP.AS', 'TKWY.AS', 'WDP.BR']
 
         return None
 
