@@ -1063,7 +1063,7 @@ class USStockMarketMetrics(Metrics):
                           'ODFL', 'MCHP', 'APH', 'DTE', 'FTV', 'MTCH', 'MKC', 'MRK', 'PFE', 'RJF', 'RTX', 'ROL', 'TT',
                           'SLG', 'FTI', 'NVDA', 'CMG', 'AVGO', 'WRB', 'EXC', 'BWA', 'K', 'IP', 'O', 'PCAR', 'DHR',
                           'BBWI', 'BDX', 'ZBH', 'SRE', 'MMM', 'IBM', 'T', 'CTAS', 'DECK', 'SMCI', 'LRCX', 'J', 'TSCO',
-                          'ETR', 'LEN', 'WDC', 'FAST', 'ORLY'])
+                          'ETR', 'LEN', 'WDC', 'FAST', 'ORLY', 'HON'])
 
         # Using Market Yield on U.S. Treasury Securities at 1-Year Constant Maturity, as proxy for riskless rate
         # Handy to get earlier data for more accurate estimates of volatility
@@ -1301,6 +1301,15 @@ class USStockMarketMetrics(Metrics):
                 'VAR': pd.Series([90814945, 90941138, 91355469, 91838813],
                                  index=pd.DatetimeIndex(['2020-05-01', '2020-07-31', '2020-11-13',
                                                          '2021-01-29']).map(last_bd)),
+                'WBA': pd.Series([880397199, 870178709, 866500000, 863901817, 864200000, 864882399, 865100000,
+                                  863272027, 863773464, 864256651, 864500000, 862503554, 862600000, 863261413,
+                                  862166970, 862500000, 863275037, 863700000, 864153468, 864458943, 865204146],
+                                 index=pd.DatetimeIndex(['2020-04-02', '2020-07-09', '2020-10-15', '2021-01-07',
+                                                         '2021-03-31', '2021-07-01', '2021-10-14', '2022-01-06',
+                                                         '2022-03-31', '2022-06-30', '2022-10-13', '2023-01-05',
+                                                         '2023-03-28', '2023-05-31', '2024-01-04', '2024-03-28',
+                                                         '2024-06-27', '2024-10-15', '2025-01-03', '2025-04-08',
+                                                         '2025-06-19']).map(last_bd)),
                 'WCG': pd.Series([50312077, 50327612],
                                  index=pd.DatetimeIndex(['2019-07-26', '2019-10-28']).map(last_bd)),
                 'WRK': pd.Series([258456273, 259255002, 259636357, 262653756, 263516869, 266116343, 267006103,
