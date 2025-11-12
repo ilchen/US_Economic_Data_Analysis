@@ -1082,12 +1082,14 @@ class USStockMarketMetrics(Metrics):
         """
         table = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies',
                              storage_options=Metrics.WIKIPEDIA_HEADERS)
-        df = table[0]
+        
+        TICKER_COLUMN = 'Symbol'
+        df = table[0] if TICKER_COLUMN in table[0].columns else table[1]
         # Correction for Yahoo-Finance's representation of Class B shares
-        sp500_components = [ticker.replace('.', '-') for ticker in df['Symbol'].to_list()]
+        sp500_components = [ticker.replace('.', '-') for ticker in df[TICKER_COLUMN].to_list()]
         # additional_share_classes = df.loc[df.loc[:, 'CIK'].duplicated(), 'Symbol'].to_list()
-        dict = df.loc[df.loc[:, 'CIK'].duplicated(keep=False), ['Symbol', 'CIK']].groupby('CIK')\
-                ['Symbol'].apply(list).to_dict()
+        dict = df.loc[df.loc[:, 'CIK'].duplicated(keep=False), [TICKER_COLUMN, 'CIK']].groupby('CIK')\
+                [TICKER_COLUMN].apply(list).to_dict()
         additional_share_classes = {}
         for cik, share_classes in dict.items():
             # The list of share_classes is guaranteed to have more than one value
