@@ -86,7 +86,7 @@ class Metrics:
         # were not traded on the last trading day. In this case forward-fill their prices and trading volumes
         # from the last trading day
         col_idx = self.data.isna().iloc[-1]
-        if len(self.data.loc[self.data.index[-1], ~col_idx]) > len(self.data.loc[self.data.index[-1], col_idx]):
+        if len(self.data.loc[self.data.index[-1], ~col_idx]) and len(self.data.loc[self.data.index[-1], col_idx]):
             self.data.loc[self.data.index[-1], col_idx] = self.data.loc[self.data.index[-2], col_idx]
 
         # In case some stocks captured in the tickers list were not trading during the date range,
@@ -1063,7 +1063,7 @@ class USStockMarketMetrics(Metrics):
                           'ODFL', 'MCHP', 'APH', 'DTE', 'FTV', 'MTCH', 'MKC', 'MRK', 'PFE', 'RJF', 'RTX', 'ROL', 'TT',
                           'SLG', 'FTI', 'NVDA', 'CMG', 'AVGO', 'WRB', 'EXC', 'BWA', 'K', 'IP', 'O', 'PCAR', 'DHR',
                           'BBWI', 'BDX', 'ZBH', 'SRE', 'MMM', 'IBM', 'T', 'CTAS', 'DECK', 'SMCI', 'LRCX', 'J', 'TSCO',
-                          'ETR', 'LEN', 'WDC', 'FAST', 'ORLY', 'HON', 'DD', 'NFLX', 'NOW', 'TPL'])
+                          'ETR', 'LEN', 'WDC', 'FAST', 'ORLY', 'HON', 'DD', 'NFLX', 'NOW', 'TPL', 'CMCSA'])
 
         # Using Market Yield on U.S. Treasury Securities at 1-Year Constant Maturity, as proxy for riskless rate
         # Handy to get earlier data for more accurate estimates of volatility
@@ -1381,17 +1381,18 @@ class EuropeBanksStockMarketMetrics(Metrics):
     def get_stoxx_europe_banks_components():
         """
         Returns a list of ticker symbols of Stoxx Europe 600 Banks Index.
-        Based on rebalancing in H1 2025.
+        Based on rebalancing in H2 2025, 53 banks
         """
-        return ['INGA.AS', 'ABN.AS', 'DBK.DE', 'CBK.DE', 'BNP.PA', 'ACA.PA', 'GLE.PA', 'KBC.BR', 'BIRG.IR', 'A5G.IR',
+        return ['INGA.AS', 'ABN.AS', 'DBK.DE', 'CBK.DE', 'BNP.PA', 'ACA.PA', 'GLE.PA', 'KBC.BR', 'KBCA.BR',
+                'BIRG.IR', 'A5G.IR',
                 'BBVA.MC', 'BKT.MC', 'CABK.MC', 'SAB.MC', 'SAN.MC', 'EBS.VI', 'BG.VI', 'RBI.VI', 'NDA-FI.HE',
-                'ISP.MI', 'UCG.MI', 'FBK.MI', 'BAMI.MI', 'BPE.MI', 'BMPS.MI', 'BPSO.MI', 'BGN.MI',
-                'HSBA.L', 'BARC.L', 'LLOY.L', 'NWG.L', 'INVP.L', 'STAN.L',
+                'ISP.MI', 'UCG.MI', 'FBK.MI', 'BAMI.MI', 'BPE.MI', 'BMPS.MI', 'BPSO.MI', 'BGN.MI', 'BCP.LS',
+                'HSBA.L', 'BARC.L', 'LLOY.L', 'NWG.L', 'INVP.L', 'STAN.L', 'BGEO.L', 'TBCG.L',
                 'BCVN.SW', 'CMBN.SW',
                 'SEB-A.ST', 'SWED-A.ST', 'SHB-A.ST', 'AZA.ST',
                 'DANSKE.CO', 'SYDB.CO', 'JYSK.CO', 'RILBA.CO',
                 'DNB.OL', 'SB1NO.OL',
-                'PEO.WA', 'PKO.WA', 'SPL.WA']
+                'PEO.WA', 'PKO.WA', 'SPL.WA', 'MBK.WA']
 
 
 class NLStockMarketMetrics(EuropeBanksStockMarketMetrics):
@@ -1428,9 +1429,9 @@ class NLStockMarketMetrics(EuropeBanksStockMarketMetrics):
 
             # If at least 3 columns match, assume this is the composition table
             if len(matching_cols) >= 3:
-                # Since Wikipedia doesn't yet reflect the extension of the index to 30 components, adjustimg manually
-                return  [component + '.AS' for component in df.loc[:, 'Ticker symbol']]\
-                         + ['CVC.AS', 'INPST.AS', 'JDEP.AS', 'TKWY.AS', 'WDP.BR']
+                # Since Wikipedia doesn't yet reflect the extension of the index to 29 components, adjusting manually
+                return  [component for component in df.loc[:, 'Ticker']]\
+                         + ['CVC.AS', 'INPST.AS', 'JDEP.AS', 'WDP.BR']
 
         return None
 
