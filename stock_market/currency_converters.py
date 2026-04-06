@@ -55,7 +55,7 @@ class EuroCurrencyConverter:
 
         # London stock exchange quotes in pence
         if 'GBp' in currencies_for_conversion:
-            self.cur_conv_df.loc[:, '.L'] /= 100.
+            self.cur_conv_df.loc[:, 'GBp'] /= 100.
 
     def get_currency_conversion_df(self):
         return self.cur_conv_df
