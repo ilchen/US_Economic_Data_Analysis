@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from pandas.tseries.offsets import YearBegin, BYearEnd, BDay, BMonthEnd, MonthBegin, QuarterEnd
+from pandas.tseries.offsets import YearBegin, BYearEnd, BDay, BMonthEnd, MonthBegin, QuarterEnd, YearEnd
 import pandas_datareader.data as web
 from math import sqrt, isclose
 from collections import defaultdict
@@ -1096,6 +1096,133 @@ class Metrics:
 
         return result, result_sectors
 
+    def get_annual_stmt_data(self, years=5, currency_conversion_df=None, tickers=None, ignore_past_composition=True):
+        """
+        Calculates a cumulative value of a subset of annual income and cashflow statements' lines for all companies
+        making up the market represented by this object.
+
+        :param years: Number of trailing years to include in the aggregation
+        :param currency_conversion_df: for heterogeneous markets made up of stocks priced in different currencies,
+                       a DataFrame whose columns are suffixes such as '.L', '.SW', '.CO', etc. and whose
+                       rows are the corresponding conversion rates.
+        :param tickers: a list of one or more ticker symbols, if None the whole market implied by this object
+                        is analyzed
+        :param ignore_past_composition: a boolean indicating if analysis is based on the current composition of
+                                        the market (True)
+        :returns: Tuple[pd.DataFrame, Dict[str, pd.DataFrame]]:
+        - The first DataFrame contains market-wide cumulative values.
+        - The second maps sector keys to their respective cumulative DataFrames.
+        """
+        if tickers:
+            self.validate_tickers_in_market(tickers)
+        last_ye = YearEnd(0).rollback(self.data.index[-1])
+        first_ye = YearEnd(0).rollback(max(self.data.index[0], last_ye - pd.DateOffset(years=years-1)))
+
+        # Unfortunately 'Operating Income', 'Interest Expense', 'EBITDA', 'EBIT' are too frequently missing
+        # => not worthwhile adding them
+        # From cashflow statements only taking 'Capital Expenditure' and  'Cash Dividends Paid'
+        idx = pd.Index(['Total Revenue', 'Pretax Income', 'Net Income', 'Tax Provision',
+                        'Capital Expenditure', 'Purchase Of Business', 'Cash Dividends Paid'])
+        idx_istmt = idx[0:4]
+        df_factory = lambda: pd.DataFrame(0., index=idx, columns=pd.date_range(first_ye, last_ye, freq='YE')[::-1])
+        result = df_factory()
+        result_sectors = defaultdict(df_factory)
+        for ticker in (tickers or
+                       self.get_current_components() if ignore_past_composition else self.ticker_symbols.keys()):
+            if ticker in self.additional_share_classes:
+                print(f'Ignoring additional share class for {ticker} to avoid double counting')
+                continue
+
+            # Only looking at the last period of being part of the market
+            (st, ed) = self.ticker_symbols[ticker][-1]
+            st = pd.Timestamp(st)
+
+            # The company fell out of the market before the start of the timeframe under analysis
+            if ed is not None and pd.Timestamp(ed) < first_ye:
+                continue
+
+            # To ensure we are able to compare 'ed' with Timestamps
+            if ed is None:
+                ed = last_ye
+            else:
+                ed = pd.Timestamp(ed)
+
+            istmt = self.tickers.tickers[ticker].income_stmt
+            cfstmt = self.tickers.tickers[ticker].cash_flow
+
+            if len(istmt.columns) == 0:
+                print(f"Yahoo Finance doesn't have income statement for {ticker} for the following quarters")
+                print(result.columns[(result.columns >= st) & (result.columns <= ed)])
+                continue
+
+            if len(cfstmt.columns) == 0:
+                print(f"Yahoo Finance doesn't have cashflow statement for {ticker} for the following quarters")
+                print(result.columns[(result.columns >= st) & (result.columns <= ed)])
+
+            # Currency conversion if required
+            currency = self.tickers.tickers[ticker].info.get('financialCurrency')
+            if currency_conversion_df is not None and currency in currency_conversion_df.columns:
+                convs = currency_conversion_df.loc[istmt.columns, currency]
+                istmt *= convs
+
+                if len(cfstmt.columns) != 0:
+                    convs = currency_conversion_df.loc[cfstmt.columns, currency]
+                    cfstmt *= convs
+
+            # Make sure we align on calendar year-end for those companies whose financial years
+            # are not calendar-aligned
+            istmt = istmt.rename(QuarterEnd(0).rollback, axis=1)
+            cfstmt = cfstmt.rename(QuarterEnd(0).rollback, axis=1)
+            istmt = istmt.rename(YearEnd(0).rollforward, axis=1)
+            cfstmt = cfstmt.rename(YearEnd(0).rollforward, axis=1)
+
+            # Remove duplicate columns due to data quality issues
+            istmt = istmt.loc[:, ~istmt.columns.duplicated()]
+            cfstmt = cfstmt.loc[:, ~cfstmt.columns.duplicated()]
+
+            if istmt.columns[0] > last_ye and (result.columns[years-1] not in istmt.columns
+                                               or (istmt.loc[idx_istmt, result.columns[years-1]]).isna().all()):
+                print(f'Need to provide values for {ticker} for {result.columns[years-1]:%Y-%m-%d}')
+
+            if istmt.columns[0] < last_ye <= ed:
+                print(f'Need to provide values for {ticker} for {last_ye:%Y-%m-%d}')
+
+            istmt = istmt.loc[:, last_ye:].astype('float64')
+            cfstmt = cfstmt.loc[:, last_ye:].astype('float64')
+
+            # Make sure that we trim to the end of the last calendar year
+            common_years = result.columns.intersection(istmt.columns)
+            if len(cfstmt.columns) != 0:
+                common_years = common_years.intersection(cfstmt.columns)
+            common_idx = istmt.index.intersection(idx)
+            common_idx_cf = cfstmt.index.intersection(idx)
+
+            # Adjusting for when the company's stock was part of the market
+            if not ignore_past_composition:
+                common_years = common_years[(common_years >= st) & (common_years <= ed)]
+            if len(common_years) == 0:
+                # The stock wasn't part of the market during the timeframe under analysis
+                continue
+
+            if len(common_idx) < len(idx_istmt):
+                print(f'For {ticker} missing the following income statement lines:')
+                print(idx_istmt.difference(common_idx))
+            if istmt.loc[common_idx, common_years].loc[:, common_years[0]].isna().any():
+                print(f'Missing {common_years[0]:%Y-%m-%d} quarter data for {ticker}'
+                      ' for the following income statement lines:')
+                print(common_idx[istmt.loc[common_idx, common_years].loc[:, common_years[0]].isna()])
+
+            sector_key = self.tickers.tickers[ticker].info.get('sectorKey', Metrics.UNIDENTIFIED_SECTOR)
+            istmt_values = istmt.loc[common_idx, common_years].fillna(0.)
+            result.loc[common_idx, common_years] += istmt_values
+            result_sectors[sector_key].loc[common_idx, common_years] += istmt_values
+            if len(cfstmt.columns) != 0:
+                cfstmt_values = cfstmt.loc[common_idx_cf, common_years].fillna(0.)
+                result.loc[common_idx_cf, common_years] += cfstmt_values
+                result_sectors[sector_key].loc[common_idx_cf, common_years] += cfstmt_values
+
+        return result, result_sectors
+
 
 class USStockMarketMetrics(Metrics):
     def __init__(self, tickers, additional_share_classes=None, stock_index='^GSPC', start=None, hist_shares_outs=None):
@@ -1128,7 +1255,8 @@ class USStockMarketMetrics(Metrics):
                           'ODFL', 'MCHP', 'APH', 'DTE', 'FTV', 'MTCH', 'MKC', 'MRK', 'PFE', 'RJF', 'RTX', 'ROL', 'TT',
                           'SLG', 'FTI', 'NVDA', 'CMG', 'AVGO', 'WRB', 'EXC', 'BWA', 'K', 'IP', 'O', 'PCAR', 'DHR',
                           'BBWI', 'BDX', 'ZBH', 'SRE', 'MMM', 'IBM', 'T', 'CTAS', 'DECK', 'SMCI', 'LRCX', 'J', 'TSCO',
-                          'ETR', 'LEN', 'WDC', 'FAST', 'ORLY', 'HON', 'DD', 'NFLX', 'NOW', 'TPL', 'CMCSA', 'AMCR'])
+                          'ETR', 'LEN', 'WDC', 'FAST', 'ORLY', 'HON', 'DD', 'NFLX', 'NOW', 'TPL', 'CMCSA', 'AMCR',
+                          'BKNG'])
 
         # Using Market Yield on U.S. Treasury Securities at 1-Year Constant Maturity, as proxy for riskless rate
         # Handy to get earlier data for more accurate estimates of volatility
@@ -1247,6 +1375,14 @@ class USStockMarketMetrics(Metrics):
                 'CXO': pd.Series([201028695, 196706121, 196701580, 196707339, 196304640],
                                  index=pd.DatetimeIndex(['2019-10-28', '2020-02-14', '2020-04-27',
                                                          '2020-07-26', '2020-10-23']).map(last_bd)),
+                'DAY': pd.Series([151331281, 152049674, 152644831, 153057180, 153594867, 154106560, 155030843,
+                                  155612552, 156127011, 159600000, 157900000, 158100000, 157700000, 158921563,
+                                  159881069, 159692530, 160034963],
+                                 index=pd.DatetimeIndex(['2021-10-27', '2022-02-18', '2022-04-27', '2022-07-28',
+                                                         '2022-10-27', '2023-02-20', '2023-04-15', '2023-07-26',
+                                                         '2023-11-02', '2024-02-23', '2024-04-24', '2024-07-24',
+                                                         '2024-10-23', '2025-02-21', '2025-04-30', '2025-07-30',
+                                                         '2025-10-22']).map(last_bd)),
                 'DFS': pd.Series([313468253, 308337638, 306300776, 306421150, 306496332, 306691722, 304887527,
                                   299468440, 293075754, 284903687, 280965096, 273171312, 273225765, 261934442,
                                   253946033, 249947996, 250057955, 250555294, 250599037, 251071540, 251226920,
@@ -1439,8 +1575,8 @@ class USStockMarketMetrics(Metrics):
             {'ABMD': 'medical-devices', 'AGN': 'drug-manufacturers-general', 'ALXN': 'drug-manufacturers-general',
              'ANSS': 'software-application', 'ATVI': 'electronic-gaming-multimedia',
              'CERN': 'health-information-services', 'CMA': 'banks-regional', 'CTLT': 'diagnostics-research',
-             'CTXS': 'software-application', 'CXO': 'oil-gas-e-p', 'DFS': 'credit-services', 'DISCK': 'entertainment',
-             'DISH': 'entertainment', 'DRE': 'reit-industrial',
+             'CTXS': 'software-application', 'CXO': 'oil-gas-e-p', 'DAY': 'software-application',
+             'DFS': 'credit-services', 'DISCK': 'entertainment', 'DISH': 'entertainment', 'DRE': 'reit-industrial',
              'ETFC': 'capital-markets', 'FISV': 'information-technology-services',
              'FLIR': 'scientific-technical-instruments', 'HBI': 'luxury-goods',
              'HES': 'oil-gas-e-p', 'INFO': 'financial-data-stock-exchanges', 'IPG': 'advertising-agencies',
