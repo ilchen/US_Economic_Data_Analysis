@@ -883,6 +883,244 @@ class Metrics:
             for ticker, industry_key in self.get_industry_keys().items()
         }
 
+    def calculate_financial_metrics(self, tickers: list, expected_market_return: float = .05,
+                                    statutory_tax_rate: float = .21) -> pd.DataFrame:
+        """
+        Takes a list of ticker symbols and returns a pandas DataFrame with efficiency metrics (ROIC, WACC, ROE, Cost of Equity)
+
+        All  calculations (NOPAT, ROIC, after-tax cost of debt, Invested Capital, etc.)
+        are aligned with the INSEAD IDP lectures.
+        """
+        self.validate_tickers_in_market(tickers)
+        risk_free_rates = self.riskless_rate.resample('ME').last()
+        market_caps = self.get_capitalization_for_companies(tickers, 'ME', 'last').iloc[:,1:].T
+
+        def get_value(df, date, possible_keys):
+            """Helper: returns first non-NaN value from possible_keys, else 0."""
+            if date not in df.columns:
+                return 0
+            for key in possible_keys:
+                if key in df.index:
+                    val = df.loc[key, date]
+                    if pd.notna(val):
+                        return val
+            return 0
+
+        rows = []
+
+        for symbol in tickers:
+            ticker = self.tickers.tickers[symbol]
+            try:
+                income_stmt = ticker.income_stmt
+                balance_sheet = ticker.balance_sheet
+                quarterly_income = ticker.quarterly_income_stmt  # for TTM fallback
+            except Exception as e:
+                print(f'Warning: failed to fetch IS or BS for {symbol}: {e}')
+
+            # Latest beta (used for all years)
+            beta = ticker.info.get("beta")
+            if beta is None or pd.isna(beta):
+                beta = self.get_beta(symbol)
+
+            # === COMPUTE CURRENT TTM EFFECTIVE TAX RATE (ultimate fallback) ===
+            ttm_tax_rate = statutory_tax_rate
+            try:
+                if not quarterly_income.empty:
+                    tax_prov_ttm = get_value(quarterly_income, quarterly_income.columns[0],
+                                             ["Tax Provision", "Income Tax Expense"])
+                    pretax_ttm = get_value(quarterly_income, quarterly_income.columns[0],
+                                           ["Pretax Income", "Income Before Tax"])
+                    if pd.notna(pretax_ttm) and pretax_ttm != 0:
+                        ttm_tax_rate = tax_prov_ttm / pretax_ttm
+            except:
+                pass
+
+            income_dates = sorted(income_stmt.columns)
+
+            prev_total_equity = None
+            prev_ic = None
+            prev_gross_debt = None
+            prev_effective_tax_rate = None
+
+            for date in income_dates:
+                year = date.year
+
+                # === INCOME STATEMENT ===
+                tax_provision = get_value(income_stmt, date,
+                                          ["Tax Provision", "Income Tax Expense", "Provision for Income Taxes",
+                                           "Provision For Income Taxes", "Taxes"])
+                pretax_income = get_value(income_stmt, date, ["Pretax Income", "Income Before Tax",
+                                                              "Pretax Income From Continuing Operations",
+                                                              "Income Before Tax And Minority Interest",
+                                                              "Earnings Before Taxes"])
+                net_income = get_value(income_stmt, date, ["Net Income", "Net Income Common Stockholders",
+                                                           "Net Income From Continuing Operations",
+                                                           "Net Income From Continuing Ops"])
+
+                raw_net_interest = get_value(income_stmt, date, ["Interest Expense", "Interest Expense Non Operating",
+                                                                 "Interest Expense - Net",
+                                                                 "Non Operating Interest Expense",
+                                                                 "Net Non Operating Interest Income Expense",
+                                                                 "Finance Costs", "Interest and Other Expense",
+                                                                 "Interest Expense And Other"])
+                net_interest = abs(raw_net_interest)
+
+                non_recurring_items = get_value(income_stmt, date, ["Non Recurring", "Non Recurring Items",
+                                                                    "Other Non-Operating Income (Expense)",
+                                                                    "Non-operating Income (Expense)",
+                                                                    "Total Unusual Items"])
+
+                effective_tax_rate = tax_provision / pretax_income\
+                    if pd.notna(pretax_income) and pretax_income != 0 else pd.NA
+
+                # Fallback order: previous year → current TTM → 21%
+                if pd.isna(effective_tax_rate) or effective_tax_rate == 0:
+                    effective_tax_rate = prev_effective_tax_rate\
+                        if prev_effective_tax_rate is not None else ttm_tax_rate
+
+                effective_tax_rate = max(0.0, min(1.0, effective_tax_rate))
+
+                nopat = net_income + net_interest * (1 - effective_tax_rate)
+                recurring_nopat = nopat + non_recurring_items * (1 - effective_tax_rate)
+                recurring_net_income = net_income + non_recurring_items * (1 - effective_tax_rate)
+
+                # === BALANCE SHEET ===
+                current_total_equity = get_value(balance_sheet, date,
+                                                 ["Total Equity Gross Minority Interest", "Total Equity",
+                                                  "Stockholders Equity", "Equity Attributable to Parent",
+                                                  "Total Stockholder Equity", "Common Stock Equity"])
+
+                # Net Debt
+                current_net_debt = 0
+                if date in balance_sheet.columns:
+                    if "Net Debt" in balance_sheet.index and pd.notna(balance_sheet.loc["Net Debt", date]):
+                        current_net_debt = balance_sheet.loc["Net Debt", date]
+                    else:
+                        cash = get_value(balance_sheet, date, ["Cash And Cash Equivalents",
+                                                               "Cash Cash Equivalents And Short Term Investments",
+                                                               "Cash And Short Term Investments"])
+                        short_term_invest = get_value(balance_sheet, date, ["Short Term Investments"])
+                        total_cash = cash + short_term_invest
+                        current_debt = get_value(balance_sheet, date, ["Current Debt", "Short Term Debt",
+                                                                       "Current Debt And Capital Lease Obligation",
+                                                                       "Current Debt And Capital Lease Obligations",
+                                                                       "Short/Current Long Term Debt"])
+                        long_term_debt = get_value(balance_sheet, date,
+                                                   ["Long Term Debt", "Long Term Debt And Capital Lease Obligation",
+                                                    "Long Term Debt (Excluding Capital Lease)"])
+                        total_debt = current_debt + long_term_debt
+                        if total_debt == 0:
+                            total_debt = get_value(balance_sheet, date, ["Total Debt"])
+                        current_net_debt = total_debt - total_cash
+
+                # Gross Debt (for after-tax cost of debt)
+                current_gross_debt = 0
+                if date in balance_sheet.columns:
+                    current_gross_debt = abs(get_value(balance_sheet, date, ["Total Debt"]))
+                    if current_gross_debt == 0:
+                        current_debt = abs(get_value(balance_sheet, date, ["Current Debt", "Short Term Debt",
+                                                                           "Current Debt And Capital Lease Obligation",
+                                                                           "Current Debt And Capital Lease Obligations",
+                                                                           "Short/Current Long Term Debt",
+                                                                           "Current Portion Of Long Term Debt"]))
+                        long_term_debt = abs(get_value(balance_sheet, date,
+                                                       ["Long Term Debt", "Long Term Debt And Capital Lease Obligation",
+                                                        "Long Term Debt (Excluding Capital Lease)", "Long-term Debt"]))
+                        current_gross_debt = current_debt + long_term_debt
+                    if current_gross_debt == 0:
+                        for idx in balance_sheet.index:
+                            if "Debt" in idx and "Net" not in idx:
+                                val = balance_sheet.loc[idx, date]
+                                if pd.notna(val):
+                                    current_gross_debt += abs(val)
+                    if current_gross_debt == 0 and "Net Debt" in balance_sheet.index and pd.notna(
+                            balance_sheet.loc["Net Debt", date]):
+                        cash = get_value(balance_sheet, date, ["Cash And Cash Equivalents",
+                                                               "Cash Cash Equivalents And Short Term Investments",
+                                                               "Cash And Short Term Investments"])
+                        short_term_invest = get_value(balance_sheet, date, ["Short Term Investments"])
+                        total_cash = cash + short_term_invest
+                        current_gross_debt = abs(balance_sheet.loc["Net Debt", date]) + total_cash
+
+                invested_capital = current_total_equity + current_net_debt
+
+                # === Averages & ROIC & ROE ===
+                if prev_ic is not None and prev_ic != 0:
+                    avg_invested_capital = (invested_capital + prev_ic) / 2
+                else:
+                    avg_invested_capital = invested_capital
+
+                avg_gross_debt = (current_gross_debt + prev_gross_debt) / 2\
+                    if prev_gross_debt is not None else current_gross_debt
+                avg_total_equity = (current_total_equity + prev_total_equity) / 2\
+                    if prev_total_equity is not None and prev_total_equity != 0 else current_total_equity
+
+                roic = nopat / avg_invested_capital\
+                    if pd.notna(avg_invested_capital) and avg_invested_capital != 0 else pd.NA
+                recurring_roic = recurring_nopat / avg_invested_capital\
+                    if pd.notna(avg_invested_capital) and avg_invested_capital != 0 else pd.NA
+                roe = net_income / avg_total_equity if pd.notna(avg_total_equity) and avg_total_equity != 0 else pd.NA
+                recurring_roe = recurring_net_income / avg_total_equity\
+                    if pd.notna(avg_total_equity) and avg_total_equity != 0 else pd.NA
+
+                # === AFTER-TAX COST OF DEBT ===
+                if pd.notna(avg_gross_debt) and avg_gross_debt > 0 and net_interest > 0:
+                    after_tax_cost_of_debt = max((net_interest / avg_gross_debt * (1 - effective_tax_rate)), 0)
+                else:
+                    after_tax_cost_of_debt = pd.NA
+
+                # === COST OF EQUITY ===
+                rf = risk_free_rates.loc[date]
+                cost_of_equity = rf + beta * expected_market_return
+
+                # === WACC ===
+                market_equity = market_caps.loc[symbol, date]
+                market_debt = current_gross_debt
+                total_capital = market_equity + market_debt
+                if total_capital > 0:
+                    w = market_equity / total_capital
+                    if pd.notna(after_tax_cost_of_debt):
+                        wacc = w * cost_of_equity + (1 - w) * after_tax_cost_of_debt
+                    else:
+                        wacc = cost_of_equity
+                else:
+                    wacc = cost_of_equity
+
+                # === EVA and MVA ===
+                eva = (roic - wacc) * avg_invested_capital
+                mva = market_debt + market_equity - current_gross_debt - invested_capital
+
+                rows.append({
+                    "symbol": symbol,
+                    "year": year,
+                    "Effective tax rate": effective_tax_rate,
+                    "ROIC": roic,
+                    "Recurring ROIC": recurring_roic,
+                    "ROE": roe,
+                    "Recurring ROE": recurring_roe,
+                    "Cost of equity": cost_of_equity,
+                    "After tax cost of debt": after_tax_cost_of_debt,
+                    "WACC": wacc,
+                    "EVA": eva,
+                    "MVA": mva,
+                    "NOPAT": nopat,
+                    "Recurring NOPAT": recurring_nopat,
+                    "Invested capital": invested_capital,
+                })
+
+                prev_total_equity = current_total_equity
+                prev_ic = invested_capital
+                prev_gross_debt = current_gross_debt
+                prev_effective_tax_rate = effective_tax_rate
+
+        if not rows:
+            return pd.DataFrame()
+
+        df = pd.DataFrame(rows)
+        df = df.set_index(["symbol", "year"])
+        df = df.sort_index()
+        return df
+
     @staticmethod
     def get_historical_components(cur_components, file_name, start=None):
         """
