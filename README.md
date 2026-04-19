@@ -16,6 +16,7 @@ So far I created the following notebooks (following a given link lets you see th
 * [Analysis of US Labor productivity (incl. comparison with that in EU)](./Labor_Productivity.ipynb)
 * [Analysis of disposable income and savings rates of US individuals](./Disposable_Income_and_Savings.ipynb), plus [a similar analysis for the Eurozone](https://github.com/ilchen/EU_Economic_Data_Analysis/blob/main/Disposable_Income_and_Savings_Eurozone.ipynbb)
 * [Analysis of US Stock Market, including various metrics on the S&P 500 Index](./Stock_Market.ipynb), plus [a similar analysis for Stoxx Europe 600 Banks Index](https://github.com/ilchen/EU_Economic_Data_Analysis/blob/main/Stock_Market_Stoxx_Europe_Banks.ipynb)
+* [Analysis of the profitability of companies from the S&P 500 Index, using metrics such as ROIC, ROE, WACC, EVA and MVA](./Stock_Market_FA.ipynb)
 
 ## Requirements
 You'll need python3 and pip. `brew install python` will do if you are on macOS. You can even forgo installing anything and run these notebooks in Google cloud, as I outline below.
@@ -88,6 +89,10 @@ or
 ```commandline
 jupyter notebook Stock_Market.ipynb
 ```
+or
+```commandline
+jupyter notebook Stock_Market_FA.ipynb
+```
 
 ## How to run in Google cloud
 You can also run these notebooks in Google cloud. This way you don't need to install anything locally. This takes just a few seconds:
@@ -107,6 +112,7 @@ or `https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/GDP_Compositio
 or `https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/Labor_Productivity.ipynb`
 or `https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/Disposable_Income_and_Savings.ipynb`
 or `https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/Stock_Market.ipynb`
+or `https://github.com/ilchen/US_Economic_Data_Analysis/blob/main/Stock_Market_FA.ipynb`
 5. Click the search icon
 6. Enjoy  
   In some of the notebooks I make use of additional python code I developed (e.g. `Current_Riskfree_Rates.ipynb`) or dependencies that are not by default provisioned in Google Colaboratory. When running these notebooks in Colaboratory, it's important to clone this repository and `cd` to it. I crated a commented out cell at the beginning of these notebooks to make it easier. Please don't forget to uncomment its content and run it first. E.g. here's one from `Current_Riskfree_Rates.ipynb`:
