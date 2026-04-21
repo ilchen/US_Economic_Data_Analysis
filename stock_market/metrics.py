@@ -920,7 +920,7 @@ class Metrics:
             # Latest beta (used for all years)
             beta = ticker.info.get("beta")
             if beta is None or pd.isna(beta):
-                beta = self.get_beta(symbol)
+                beta = self.get_beta([symbol])
 
             # === COMPUTE CURRENT TTM EFFECTIVE TAX RATE (ultimate fallback) ===
             ttm_tax_rate = statutory_tax_rate
@@ -1042,7 +1042,8 @@ class Metrics:
                         total_cash = cash + short_term_invest
                         current_gross_debt = abs(balance_sheet.loc["Net Debt", date]) + total_cash
 
-                invested_capital = current_total_equity + current_net_debt
+                # Some cash-rich companies such as Adyen might have large negative net debt, taking it into account...
+                invested_capital = current_total_equity + max(0, current_net_debt)
 
                 # === Averages & ROIC & ROE ===
                 if prev_ic is not None and prev_ic != 0:
