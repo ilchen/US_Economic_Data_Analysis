@@ -884,7 +884,7 @@ class Metrics:
         }
 
     def calculate_financial_metrics(self, tickers: list, expected_market_return: float = .05,
-                                    statutory_tax_rate: float = .21) -> pd.DataFrame:
+                                    statutory_tax_rate: float = .21, currency_conversion_df = None) -> pd.DataFrame:
         """
         Takes a list of ticker symbols and returns a pandas DataFrame with efficiency metrics (ROIC, WACC, ROE, Cost of Equity)
 
@@ -1090,6 +1090,13 @@ class Metrics:
                 # === EVA and MVA ===
                 eva = (roic - wacc) * avg_invested_capital
                 mva = market_debt + market_equity - current_gross_debt - invested_capital
+
+                # Currency conversion if required
+                currency = ticker.info.get('financialCurrency')
+                if currency_conversion_df is not None and currency in currency_conversion_df.columns:
+                    convs = currency_conversion_df.loc[date, currency]
+                    eva *= convs
+                    mva *= convs
 
                 rows.append({
                     "symbol": symbol,
