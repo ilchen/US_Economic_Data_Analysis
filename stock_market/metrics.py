@@ -738,6 +738,8 @@ class Metrics:
           - ROE              : current reported ROE (TTM) from yfinance.info
           - P/B              : current Price-to-Book from yfinance.info
           - Forward ROE      : projected ROE for the selected fiscal year
+          - Forward P/B      : projected P/B for the selected fiscal year, assumes markets already
+                               take into account projected earnings growth and the current price reflects it
 
         Parameters
         ----------
@@ -806,6 +808,13 @@ class Metrics:
                     if avg_book_equity > 0:
                         forward_roe = eps_target / avg_book_equity
                         ret.loc[ticker, 'Forward ROE'] = forward_roe
+
+                    # Step 6: Forward P/B
+                    market_price = info.get('currentPrice') or info.get('regularMarketPrice')
+                    if ticker.endswith('.L'):
+                        market_price /= 100.
+                    if pd.notna(market_price) and market_price > 0:
+                        ret.loc[ticker, 'Forward P/B'] = market_price / book_value_end_target
 
             except Exception:
                 pass  # Leave as NaN if any data is missing
@@ -1206,7 +1215,8 @@ class Metrics:
                     eva = (roe - cost_of_equity) * avg_total_equity
                 else:
                     eva = (roic - wacc) * avg_invested_capital
-                mva = market_debt + market_equity - current_gross_debt - invested_capital
+                # mva = market_debt + market_equity - current_gross_debt - invested_capital
+                mva = market_debt + market_equity - current_gross_debt - current_total_equity
 
                 # Currency conversion if required
                 currency = ticker.info.get('financialCurrency')
