@@ -761,8 +761,9 @@ class Metrics:
                 ret.loc[ticker, 'ROE'] = info['returnOnEquity']
                 ret.loc[ticker, 'P/B'] = info['priceToBook']
 
-                if ticker.endswith('.L'):
-                    ret.loc[ticker, 'P/B'] /= 100.
+                # No longer needed
+                # if ticker.endswith('.L'):
+                #    ret.loc[ticker, 'P/B'] /= 100.
 
             # === FORWARD ROE ===
             try:
@@ -1641,7 +1642,7 @@ class USStockMarketMetrics(Metrics):
                           'SLG', 'FTI', 'NVDA', 'CMG', 'AVGO', 'WRB', 'EXC', 'BWA', 'K', 'IP', 'O', 'PCAR', 'DHR',
                           'BBWI', 'BDX', 'ZBH', 'SRE', 'MMM', 'IBM', 'T', 'CTAS', 'DECK', 'SMCI', 'LRCX', 'J', 'TSCO',
                           'ETR', 'LEN', 'WDC', 'FAST', 'ORLY', 'HON', 'DD', 'NFLX', 'NOW', 'TPL', 'CMCSA', 'AMCR',
-                          'BKNG'])
+                          'BKNG', 'CVNA'])
 
         # Using Market Yield on U.S. Treasury Securities at 1-Year Constant Maturity, as proxy for riskless rate
         # Handy to get earlier data for more accurate estimates of volatility
@@ -2073,7 +2074,7 @@ class NLStockMarketMetrics(EuropeBanksStockMarketMetrics):
                 # Since Wikipedia doesn't yet reflect the extension of the index to 29 components, adjusting manually
                 ret = [component for component in df.loc[:, 'Ticker']]
                 ret.remove('RAND.AS')
-                return  ret + ['CVC.AS', 'INPST.AS', 'JDEP.AS', 'WDP.BR', 'MICC.AS', 'SBMO.AS']
+                return  ret + ['CVC.AS', 'INPST.AS', 'WDP.BR', 'MICC.AS', 'SBMO.AS']
 
         return None
 
