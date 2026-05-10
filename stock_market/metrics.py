@@ -164,8 +164,7 @@ class Metrics:
                 if len(f.index.intersection(self.data.index)):
                     f = f.loc[self.data.index[0]:, ['close', 'volume']]
                     f.columns = pd.MultiIndex.from_tuples(list(zip([self.CLOSE, self.VOLUME], [ticker]*2)))
-    
-                    self.data.loc[self.data.index[0]:f.index[-1], ([self.CLOSE, self.VOLUME], ticker)] = f
+                    self.data.loc[max(self.data.index[0],f.index[0]):f.index[-1], ([self.CLOSE, self.VOLUME], ticker)] = f
 
         # Currency conversion
         if currency_conversion_df is not None:
