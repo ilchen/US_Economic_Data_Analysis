@@ -20,6 +20,7 @@ class CapChangePlotter:
         self,
         start_date: str | datetime | pd.Timestamp | None = None,
         end_date: str | datetime | pd.Timestamp | None = None,
+        name_expander: Callable[[str], str] = lambda x: x
     ):
         """
         start_date, end_date: Will be converted to pd.Timestamp.
@@ -30,6 +31,7 @@ class CapChangePlotter:
 
         # Derive title parts
         self.title_prefix, self.subtitle = self._derive_title_parts()
+        self.name_expander = name_expander
 
     def _get_end_label(self, dt: pd.Timestamp) -> str:
         next_bd = dt + pd.offsets.BDay(1)
@@ -63,8 +65,7 @@ class CapChangePlotter:
 
         return title_prefix, subtitle
 
-    def plot_cap_change_bars(self, changes: pd.Series, mode: str='top', cut_off: int = 40,
-                             name_expander: Callable[[str], str] = lambda x: x):
+    def plot_cap_change_bars(self, changes: pd.Series, mode: str='top', cut_off: int = 40):
         """
         Plot horizontal bar chart for gainers, losers, or mixed.
         """
@@ -89,7 +90,7 @@ class CapChangePlotter:
         else:
             raise ValueError("mode must be 'top', 'bottom', or 'mixed'")
 
-        display_names = [name_expander(ticker) for ticker in data.index]
+        display_names = [self.name_expander(ticker) for ticker in data.index]
 
         fig_height = max(8, max(len(display_names), cut_off) * 0.42)
         fig, ax = plt.subplots(figsize=(16, fig_height))
@@ -145,6 +146,170 @@ class CapChangePlotter:
         plt.tight_layout()
 
         return fig, ax
+
+    def plot_top_n_cap_bars(self, title: str, top_n_now: pd.DataFrame, n: int = 20, currency_symbol: str = "€") -> None:
+        """
+        Horizontal bar chart for Top-N entities by current market cap.
+        Fully generic — works for any market/index/sector (banks, insurers, etc.).
+        Uses the same clean styling and label inference logic as plot_cap_change_bars.
+        
+        Parameters
+        ----------
+        title : str
+            Name of the market (e.g. "Stoxx Europe 600 Banks", 
+            "Global Banks", "Stoxx Europe 600 Insurance", ...)
+        top_n_now : pd.DataFrame
+            DataFrame with exactly two columns:
+              - Column 0: capitalization on self.start_date (billions)
+              - Column 1: capitalization on self.end_date (billions)
+            Index = tickers.
+        n : int
+            Number of top entities to display (default 20).
+        currency_symbol : str
+            Currency symbol (e.g. "€", "$", "£", "EUR", "USD", "GBP").
+        """
+        if len(top_n_now.columns) < 2:
+            raise ValueError("top_n_now must have at least two columns (prev_cap, now_cap)")
+
+        n = min(len(top_n_now), n)
+
+        prev_col = top_n_now.columns[0]
+        now_col = top_n_now.columns[1]
+
+        # ── Current Top-N (sorted by current capitalization)
+        current_top_n_df = top_n_now.sort_values(by=now_col, ascending=False).head(n)
+
+        # ── Current ranks (1 = largest)
+        current_ranks = pd.Series(range(1, n + 1), index=current_top_n_df.index)
+
+        # ── Previous ranks (computed from the previous-year column)
+        prev_sorted_caps = top_n_now[prev_col].dropna().sort_values(ascending=False)
+        prev_ranks = pd.Series(
+            range(1, len(prev_sorted_caps) + 1),
+            index=prev_sorted_caps.index
+        )
+        prev_ranks_current = prev_ranks.reindex(current_top_n_df.index, fill_value=n + 1)
+
+        # Position change: positive = gained positions
+        delta_positions = prev_ranks_current - current_ranks
+
+        # Market caps now (already in billions)
+        caps_bn = current_top_n_df[now_col]
+
+        # Delta market cap (new entrants treated as gained from 0)
+        prev_caps_for_delta = current_top_n_df[prev_col].fillna(0)
+        delta_caps = current_top_n_df[now_col] - prev_caps_for_delta
+
+        # Nice display names (reuses your existing ticker_to_name mapping)
+        display_names = [self.name_expander(ticker) for ticker in current_top_n_df.index]
+
+        # Reverse order so #1 appears at the TOP of the chart
+        display_names = display_names[::-1]
+        caps_values = caps_bn.values[::-1]
+        deltas_pos = delta_positions.values[::-1]
+        deltas_cap = delta_caps.values[::-1]
+
+        # =============================================================================
+        # PLOT
+        # =============================================================================
+        fig_height = max(9, n * 0.42)
+        fig, ax = plt.subplots(figsize=(16, fig_height))
+
+        # Gradient blue (larger banks = darker blue)
+        norm = plt.Normalize(caps_values.min(), caps_values.max())
+        cmap = plt.get_cmap("Blues")
+        colors = cmap(norm(caps_values))
+
+        bars = ax.barh(
+            display_names,
+            caps_values,
+            color=colors,
+            edgecolor="white",
+            linewidth=0.6,
+        )
+
+        # Step 1: Draw ALL capitalization labels first (black)
+        cap_texts = []
+        for bar, cap, delta_cap in zip(bars, caps_values, deltas_cap):
+            y = bar.get_y() + bar.get_height() / 2
+            bar_end = cap
+            sign = "+" if delta_cap >= 0 else ""
+            cap_label = f"{currency_symbol}{cap:,.0f}bn ({sign}{delta_cap:,.0f}bn)"
+            txt = ax.text(
+                bar_end + 1.5,
+                y,
+                cap_label,
+                va="center",
+                ha="left",
+                fontsize=10,
+                fontweight="bold",
+                color="#1f2937",
+            )
+            cap_texts.append(txt)
+
+        # Force matplotlib to render the text so we can get accurate bounding boxes
+        fig.canvas.draw()
+
+        # Step 2: Place position arrows dynamically right next to each cap label (zero gap)
+        for txt, delta_pos in zip(cap_texts, deltas_pos):
+            if delta_pos != 0:
+                # Get the exact right edge of the rendered cap label (in data coordinates)
+                bbox = txt.get_window_extent()
+                arrow_x = ax.transData.inverted().transform((bbox.x1, 0))[0] + 0.8
+
+                if delta_pos > 0:
+                    arrow_str = f"▲{delta_pos:.0f}"
+                    arrow_color = "#10b981"
+                else:
+                    lost = -delta_pos
+                    arrow_str = f"▼{lost:.0f}"
+                    arrow_color = "#ef4444"
+
+                ax.text(
+                    arrow_x,
+                    txt.get_position()[1],
+                    arrow_str,
+                    va="center",
+                    ha="left",
+                    fontsize=10,
+                    fontweight="bold",
+                    color=arrow_color,
+                )
+
+        # Auto-expand right margin just enough for labels + arrows
+        max_cap = caps_values.max()
+        ax.set_xlim(right=max_cap * 1.02 + 45)
+
+        # === Clean professional styling (identical to plot_cap_change_bars) ===
+        ax.xaxis.set_major_formatter('{x:,.0f}')
+
+        # Dynamic x-label based on currency_symbol
+        if currency_symbol in ("€", "EUR"):
+            currency_name = "Euros"
+        elif currency_symbol in ("$", "USD"):
+            currency_name = "Dollars"
+        elif currency_symbol in ("£", "GBP"):
+            currency_name = "Pounds"
+        else:
+            currency_name = currency_symbol   # fallback
+        ax.set_xlabel(f"Billions of {currency_name}", fontsize=12, labelpad=10)
+
+        ax.grid(True, axis="x", linestyle="--", alpha=0.7)
+        ax.spines[["top", "right", "left"]].set_visible(False)
+        ax.yaxis.set_ticks_position("none")
+
+        ax.set_ylim(-0.6, n - 0.4)
+
+        # Use the class's inferred start and end labels
+        end_label = self._get_end_label(self.end_date)
+        start_label = self._get_start_label(self.start_date)
+
+        ax.set_title(
+            f"Top-{n} {title} by market capitalization on {self.end_date.strftime("%Y-%m-%d")} (change from {start_label})")
+
+        # Generous left margin for long bank names
+        fig.subplots_adjust(left=0.38)
+        plt.tight_layout()
 
 
 class BankROEPBPlotter:
