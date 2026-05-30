@@ -731,11 +731,13 @@ class Metrics:
         """
         return self.get_excess_return_helper(years, frequency, True)
 
-    def get_roe_and_pb(self, tickers, forward_horizon: str="current"):
+    def get_roe_and_pb(self, tickers, forward_horizon: str="current",
+                       quarter_end: date | pd.Timestamp | str | None = None):
         """
         Constructs a DataFrame indexed by tickers with the following columns:
           - ROE              : current reported ROE (TTM) from yfinance.info
-          - P/B              : current Price-to-Book from yfinance.info
+          - P/B              : current Price-to-Book from yfinance.info (when quarter_end=None)
+                               or historical P/B from get_valuation_measures() (when quarter_end provided)
           - Forward ROE      : projected ROE for the selected fiscal year
           - Forward P/B      : projected P/B for the selected fiscal year, assumes markets already
                                take into account projected earnings growth and the current price reflects it
@@ -745,6 +747,10 @@ class Metrics:
         forward_horizon : str, default "current"
             "current" → uses current fiscal year ('0y')
             "next"    → uses next fiscal year ('+1y')
+        quarter_end : date | pd.Timestamp | str | None, default None
+            Quarter-end date for which to fetch P/B from get_valuation_measures().
+            If None, falls back to current behavior (latest from .info).
+            The date will be normalized to the nearest calendar quarter end if needed.
         """
         ret = pd.DataFrame(index=tickers, columns=['ROE', 'P/B', 'Forward ROE'])
 
@@ -762,7 +768,28 @@ class Metrics:
 
                 # No longer needed
                 # if ticker.endswith('.L'):
-                #    ret.loc[ticker, 'P/B'] /= 100.
+                #     ret.loc[ticker, 'P/B'] /= 100.
+
+            # A more accurate value of P/B
+            if quarter_end:
+                ret.loc[ticker, 'P/B'] = np.nan
+                val_measures = t.get_valuation_measures()
+
+                # Normalize quarter_end to QuarterEnd if needed
+                if not isinstance(quarter_end, pd.Timestamp):
+                    quarter_end = pd.Timestamp(quarter_end).normalize()
+                # Always apply rollforward
+                quarter_end = pd.offsets.QuarterEnd(0).rollforward(quarter_end)
+
+                # Depending on the exact shape of val_measures (it can vary by yfinance version)
+                # Typical cases: multi-index, columns as dates, or rows as periods
+                if not val_measures.empty:
+                    val_measures = val_measures.iloc[:, 1:].set_axis(pd.DatetimeIndex(val_measures.columns[1:]), axis=1)
+                    pb_idx = 'Price/Book' if 'Price/Book' in val_measures.index else 'priceToBook'
+                    try:
+                        ret.loc[ticker, 'P/B'] = pd.to_numeric(val_measures.loc[pb_idx, quarter_end], errors='coerce')
+                    except (KeyError, IndexError):
+                        pass
 
             # === FORWARD ROE ===
             try:
@@ -1727,6 +1754,17 @@ class USStockMarketMetrics(Metrics):
                                   index=pd.DatetimeIndex(['2020-02-20', '2020-04-28', '2020-10-22', '2021-04-27',
                                                           '2022-07-25', '2022-10-31', '2023-02-16', '2023-04-28',
                                                           '2023-07-24']).map(last_bd)),
+                'BNY': pd.Series([900683008, 885051008, 886136000, 878515008, 875481024, 863174016, 876185024,
+                                  825820992, 835950016, 804145024, 807798016, 808280000, 808444992, 789134016,
+                                  778782016, 769073024, 759344000, 752870976, 747816000, 737956992, 727078016,
+                                  717680000, 715433984, 705241024, 697349000, 686379000, 686379045],
+                                  index=pd.DatetimeIndex(['2020-01-01', '2020-03-01', '2020-10-01', '2021-02-01',
+                                                          '2021-04-01', '2021-07-01', '2021-09-01', '2021-10-01',
+                                                          '2021-11-01', '2022-01-01', '2022-05-01', '2022-10-01',
+                                                          '2023-01-01', '2023-04-01', '2023-07-01', '2023-11-01',
+                                                          '2024-01-01', '2024-03-01', '2024-04-01', '2024-07-01',
+                                                          '2024-10-01', '2025-01-01', '2025-04-01', '2025-07-01',
+                                                          '2025-10-01', '2026-04-01', '2026-05-21']).map(last_bd)),
                 'BRK-B': pd.Series([1385994959, 1401356454, 1390707370, 1370951744, 1336348609, 1326572128, 1325373100,
                                     1303476707, 1291212661, 1285751332, 1301126370, 1301981370, 1301100243, 1295970861,
                                     1308070268, 1308414093, 1310805008, 1311384883, 1325192508, 1328446516, 1338051639],
