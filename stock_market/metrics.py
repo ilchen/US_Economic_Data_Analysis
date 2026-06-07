@@ -1668,7 +1668,7 @@ class USStockMarketMetrics(Metrics):
                           'SLG', 'FTI', 'NVDA', 'CMG', 'AVGO', 'WRB', 'EXC', 'BWA', 'K', 'IP', 'O', 'PCAR', 'DHR',
                           'BBWI', 'BDX', 'ZBH', 'SRE', 'MMM', 'IBM', 'T', 'CTAS', 'DECK', 'SMCI', 'LRCX', 'J', 'TSCO',
                           'ETR', 'LEN', 'WDC', 'FAST', 'ORLY', 'HON', 'DD', 'NFLX', 'NOW', 'TPL', 'CMCSA', 'AMCR',
-                          'BKNG', 'CVNA'])
+                          'BKNG', 'CVNA', 'FDX'])
 
         # Using Market Yield on U.S. Treasury Securities at 1-Year Constant Maturity, as proxy for riskless rate
         # Handy to get earlier data for more accurate estimates of volatility
