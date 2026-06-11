@@ -74,7 +74,7 @@ class Metrics:
         self.data = self.data.loc[:, ([Metrics.CLOSE, Metrics.VOLUME])]
 
         # Required until the 'ignore_tz' parameter in the 'download' method starts working again
-        # self.data.index = self.data.index.tz_localize(None)
+        # self.data.index = self.data.index.tz_localize(
 
         # If some stocks that are no longer part of the index and are no longer listed were traded over the counter,
         # while stocks still in the index were not traded, we need to make an adjustment
@@ -1874,6 +1874,17 @@ class USStockMarketMetrics(Metrics):
                                                          '2023-02-24', '2023-05-04', '2023-08-03', '2023-11-02',
                                                          '2024-02-26', '2024-05-07', '2024-08-08', '2024-11-06',
                                                          '2025-02-27', '2025-05-08']).map(last_bd)),
+                'HOLX': pd.Series([263302012, 258205678, 258985242, 257009683, 257661792, 256233027, 253487389,
+                                  251420529, 249984116, 249380946, 249653133, 245833759, 246554026, 246118192,
+                                  244942081, 240002802, 234731521, 233376948, 232271906, 226941217, 224389612,
+                                  222845246, 222419282, 222905228, 223244905],
+                                 index=pd.DatetimeIndex(['2020-01-23', '2020-04-23', '2020-07-23', '2020-11-12',
+                                                         '2021-01-21', '2021-04-22', '2021-07-22', '2021-11-11',
+                                                         '2022-01-27', '2022-04-21', '2022-07-21', '2022-11-10',
+                                                         '2023-01-26', '2023-04-25', '2023-07-25', '2023-11-14',
+                                                         '2024-01-25', '2024-04-25', '2024-07-25', '2024-11-21',
+                                                         '2025-01-31', '2025-04-25', '2025-07-25', '2025-11-13',
+                                                         '2026-01-23']).map(last_bd)),
                 'INFO': pd.Series([392948672, 398916408, 396809671, 398358566, 398612292, 398841378, 399080370],
                                   index=pd.DatetimeIndex(['2019-12-31', '2020-02-29', '2020-05-31', '2020-08-31',
                                                           '2021-05-31', '2021-08-31', '2021-12-31']).map(last_bd)),
@@ -1943,6 +1954,13 @@ class USStockMarketMetrics(Metrics):
                 'SBNY': pd.Series([60632000, 63065000, 62929000, 62927000, 62929000, 62250000],
                                   index=pd.DatetimeIndex(['2021-11-15', '2022-02-15', '2022-05-15', '2022-08-15',
                                                           '2022-11-15', '2023-01-31']).map(last_bd)),
+                'SEE': pd.Series([154670740, 155662645, 155676478, 155153238, 154919232, 151989913, 149892825,
+                                  148156720, 148158143, 146084428, 145227126, 144657522, 143961618, 144386418,
+                                  144410149],
+                                  index=pd.DatetimeIndex(['2020-02-21', '2020-04-30', '2020-07-31', '2020-10-23',
+                                                          '2021-02-16', '2021-04-30', '2021-07-31', '2021-10-31',
+                                                          '2022-02-15', '2022-04-29', '2022-07-29', '2022-10-28',
+                                                          '2023-02-15', '2023-04-28', '2023-07-31']).map(last_bd)),
                 'SIVB': pd.Series([51513227, 51796902, 54315140, 56436504, 58687392, 58802627, 58851167, 59082305,
                                    59104124, 59200925],
                                   index=pd.DatetimeIndex(['2020-04-30', '2020-10-31', '2021-04-30', '2021-07-31',
@@ -2001,11 +2019,12 @@ class USStockMarketMetrics(Metrics):
              'CTXS': 'software-application', 'CXO': 'oil-gas-e-p', 'DAY': 'software-application',
              'DFS': 'credit-services', 'DISCK': 'entertainment', 'DISH': 'entertainment', 'DRE': 'reit-industrial',
              'ETFC': 'capital-markets', 'FISV': 'information-technology-services',
-             'FLIR': 'scientific-technical-instruments', 'HBI': 'luxury-goods',
-             'HES': 'oil-gas-e-p', 'INFO': 'financial-data-stock-exchanges', 'IPG': 'advertising-agencies',
+             'FLIR': 'scientific-technical-instruments', 'HBI': 'luxury-goods', 'HES': 'oil-gas-e-p',
+             'HOLX': 'medical-devices', 'INFO': 'financial-data-stock-exchanges', 'IPG': 'advertising-agencies',
              'JNPR': 'communication-equipment', 'JWN': 'department-stores', 'K': 'packaged-foods', 'KSU': 'railroads',
              'MRO': 'oil-gas-e-p', 'MXIM': 'semiconductors', 'NBL': 'oil-gas-e-p', 'NLSN': 'engineering-construction',
              'PBCT': 'banks-regional', 'PXD': 'oil-gas-e-p', 'RTN': 'aerospace-defense', 'SBNY': 'banks-regional',
+             'SEE': 'packaging-containers',
              'SIVB': 'banks-regional', 'TIF': 'luxury-goods', 'TWTR': 'internet-content-information',
              'VAR': 'medical-instruments-supplies', 'WBA': 'pharmaceutical-retailers', 'WCG': 'healthcare-plans',
              'WRK': 'packaging-containers', 'XEC': 'oil-gas-e-p', 'XLNX': 'semiconductors'
