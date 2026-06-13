@@ -147,7 +147,8 @@ class CapChangePlotter:
 
         return fig, ax
 
-    def plot_top_n_cap_bars(self, title: str, top_n_now: pd.DataFrame, n: int = 20, currency_symbol: str = "€") -> None:
+    def plot_top_n_cap_bars(self, title: str, top_n_now: pd.DataFrame, n: int = 20, currency_symbol: str = "€",
+                            is_market_cap: bool=True) -> None:
         """
         Horizontal bar chart for Top-N entities by current market cap.
         Fully generic — works for any market/index/sector (banks, insurers, etc.).
@@ -305,7 +306,8 @@ class CapChangePlotter:
         start_label = self._get_start_label(self.start_date)
 
         ax.set_title(
-            f"Top-{n} {title} by market capitalization on {self.end_date.strftime("%Y-%m-%d")} (change from {start_label})")
+            f"Top-{n} {title} " + ('by market capitalization ' if is_market_cap else '' )
+            + f"on {self.end_date.strftime("%Y-%m-%d")} (change from {start_label})")
 
         # Generous left margin for long bank names
         fig.subplots_adjust(left=0.38)
