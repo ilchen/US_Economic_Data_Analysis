@@ -1668,14 +1668,24 @@ class USStockMarketMetrics(Metrics):
                           'SLG', 'FTI', 'NVDA', 'CMG', 'AVGO', 'WRB', 'EXC', 'BWA', 'K', 'IP', 'O', 'PCAR', 'DHR',
                           'BBWI', 'BDX', 'ZBH', 'SRE', 'MMM', 'IBM', 'T', 'CTAS', 'DECK', 'SMCI', 'LRCX', 'J', 'TSCO',
                           'ETR', 'LEN', 'WDC', 'FAST', 'ORLY', 'HON', 'DD', 'NFLX', 'NOW', 'TPL', 'CMCSA', 'AMCR',
-                          'BKNG', 'CVNA', 'FDX'])
+                          'BKNG', 'CVNA', 'FDX', 'KLAC'])
 
         # Using Market Yield on U.S. Treasury Securities at 1-Year Constant Maturity, as proxy for riskless rate
         # Handy to get earlier data for more accurate estimates of volatility
-        self.riskless_rate = web.get_data_fred('DGS1', start - pd.DateOffset(years=3))
+        try:
+            self.riskless_rate = web.get_data_fred('DGS1', start - pd.DateOffset(years=3), timeout=90)
+        except Exception as e:
+            try:
+                self.riskless_rate = web.get_data_fred('WGS1YR', start - pd.DateOffset(years=3), timeout=90)\
+                    .resample('B').ffill()
+            except Exception as e2:
+                print(f"⚠️  FRED ReadTimeout / network error fetching DGS1/WGS1YR (riskless rate): {e2}\n"
+                      f"   Proceeding with self.riskless_rate = None")
+                self.riskless_rate = None
 
         # Convert into pd.Series and percentage points
-        self.riskless_rate = self.riskless_rate.dropna().iloc[:,0] / 100.
+        if self.riskless_rate is not None:
+            self.riskless_rate = self.riskless_rate.dropna().iloc[:,0] / 100.
 
     @staticmethod
     def get_sp500_components():
