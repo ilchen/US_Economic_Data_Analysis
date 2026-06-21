@@ -65,7 +65,8 @@ class CapChangePlotter:
 
         return title_prefix, subtitle
 
-    def plot_cap_change_bars(self, changes: pd.Series, mode: str='top', cut_off: int = 40):
+    def plot_cap_change_bars(self, changes: pd.Series, mode: str='top', cut_off: int=40,
+                             graph_title: str=None):
         """
         Plot horizontal bar chart for gainers, losers, or mixed.
         """
@@ -130,7 +131,10 @@ class CapChangePlotter:
                     fontsize=10, fontweight='bold', color=label_color)
 
         # Titles & styling
-        title = f'{self.title_prefix} change in capitalization, %'\
+        if graph_title:
+            title = graph_title
+        else:
+            title = f'{self.title_prefix} change in capitalization, %'\
                     + (f' ({mode} {cut_off})\n' if cut_off < len(changes) and mode != 'mixed' else '\n') + self.subtitle
         ax.set_title(title)
 
