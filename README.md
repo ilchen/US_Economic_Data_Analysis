@@ -1,5 +1,5 @@
-# US Economic Data Analysis
-This repository contains Jupyter notebooks that visually analyze US Economic data as provided by [St. Louis Fed](https://fred.stlouisfed.org), the [OECD](https://stats.oecd.org), and [Yahoo-Finance](https://finance.yahoo.com/). The analysis is carried out using [Pandas](https://pandas.pydata.org), [Matplotlib](https://matplotlib.org/stable/index.html) and a combination of [Pandas datareader](https://pydata.github.io/pandas-datareader/), [SDMX](https://sdmx1.readthedocs.io/en/latest/), and [yfinance](https://pypi.org/project/yfinance/) libraries for data retrieval via APIs.
+# U.S. Economic Data Analysis
+This repository contains Jupyter notebooks that visually analyze US Economic data as provided by [St. Louis Fed](https://fred.stlouisfed.org), the [OECD](https://stats.oecd.org), the [World Bank](https://data.worldbank.org), and [Yahoo-Finance](https://finance.yahoo.com/). The analysis is carried out using [Pandas](https://pandas.pydata.org), [Matplotlib](https://matplotlib.org/stable/index.html) and a combination of [Pandas datareader](https://pydata.github.io/pandas-datareader/), [SDMX](https://sdmx1.readthedocs.io/en/latest/), and [yfinance](https://pypi.org/project/yfinance/) libraries for data retrieval via APIs.
 
 So far I created the following notebooks (following a given link lets you see the most recent run of its notebook, I aim to refresh results monthly):
 * [Analysis of CPI, Fed Funds Rate, Treasury rates and Inflation expectations](./CPI_and_Fed_Funds_Rates.ipynb), plus [a similar analysis for the Eurozone by way of comparison](https://github.com/ilchen/EU_Economic_Data_Analysis/blob/main/HICP_and_ECB_Rates.ipynb)
@@ -25,7 +25,7 @@ In case you opt for a local installation, the rest of the dependencies can be in
 ```commandline
 python3 -m pip install -r requirements.txt
 ```
-**NB**: I use Yahoo-Finance data in the `Current_Riskfree_Rates.ipynb` notebook. I switched fully to [yfinance](https://pypi.org/project/yfinance/) for working with Yahoo-Finance data due to its better maintenance and frequent new releases.
+**NB**: I use Yahoo-Finance data in the `Current_Riskfree_Rates.ipynb`, `Stock_Market.ipynb`, and `Stock_Market_FA.ipynb` notebooks. I switched fully to [yfinance](https://pypi.org/project/yfinance/) for working with Yahoo-Finance data due to its better maintenance and frequent new releases.
 
 ## How to run locally
 If you want to run the notebooks locally on your laptop, clone the repo and `cd` into its directory, e.g.:
