@@ -1895,6 +1895,9 @@ class USStockMarketMetrics(Metrics):
                                                          '2024-01-25', '2024-04-25', '2024-07-25', '2024-11-21',
                                                          '2025-01-31', '2025-04-25', '2025-07-25', '2025-11-13',
                                                          '2026-01-23']).map(last_bd)),
+                'IBKR': pd.Series([445246976, 445363717, 445439458, 445484364],
+                                  index=pd.DatetimeIndex(['2025-08-06', '2025-10-31', '2026-02-23', '2025-05-05'])
+                                  .map(last_bd)),
                 'INFO': pd.Series([392948672, 398916408, 396809671, 398358566, 398612292, 398841378, 399080370],
                                   index=pd.DatetimeIndex(['2019-12-31', '2020-02-29', '2020-05-31', '2020-08-31',
                                                           '2021-05-31', '2021-08-31', '2021-12-31']).map(last_bd)),
@@ -2137,10 +2140,10 @@ class NLStockMarketMetrics(EuropeBanksStockMarketMetrics):
 
             # If at least 3 columns match, assume this is the composition table
             if len(matching_cols) >= 3:
-                # Since Wikipedia doesn't yet reflect the extension of the index to 29 components, adjusting manually
+                # Since Wikipedia doesn't yet reflect the extension of the index to 30 components, adjusting manually
                 ret = [component for component in df.loc[:, 'Ticker']]
                 ret.remove('RAND.AS')
-                return  ret + ['CVC.AS', 'INPST.AS', 'WDP.BR', 'MICC.AS', 'SBMO.AS']
+                return  ret + ['CVC.AS', 'INPST.AS', 'WDP.BR', 'MICC.AS', 'SBMO.AS', 'AALB.AS']
 
         return None
 
