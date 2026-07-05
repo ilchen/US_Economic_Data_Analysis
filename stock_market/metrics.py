@@ -166,6 +166,23 @@ class Metrics:
                     f.columns = pd.MultiIndex.from_tuples(list(zip([self.CLOSE, self.VOLUME], [ticker]*2)))
                     self.data.loc[max(self.data.index[0],f.index[0]):f.index[-1], ([self.CLOSE, self.VOLUME], ticker)] = f
 
+        # Safety net for stock-splits
+        if tickers_to_correct_for_splits is not None:
+            tickers_not_to_correct_for_splits = self.ticker_symbols.keys() - tickers_to_correct_for_splits -\
+                    set(delisted_tickers)
+            for ticker in tickers_not_to_correct_for_splits & set(self.get_current_components()):
+                splits = self.tickers.tickers[ticker].splits
+                if splits is not None and len(splits) > 0 and splits.index[-1].tz_localize(None) > self.data.index[0]:
+                    split_date = splits.index[-1].tz_localize(None)
+                    (st, ed) = self.get_first_entry_last_exit(ticker)
+                    if st < split_date and (ed is None or ed > split_date):
+                        print(f'\tProcessing a stock split reported by Yahoo-Finance API on {split_date:%Y-%m-%d} for {ticker}')
+                        volume_key = (self.VOLUME, ticker)
+                        # Perform adjustment as float, then round and cast back to int64
+                        adjusted_volume = self.data.loc[:split_date - BDay(1), volume_key].astype(float) / splits.iloc[-1]
+                        self.data.loc[:split_date-BDay(1), (self.CLOSE, ticker)] *= splits.iloc[-1]
+                        self.data.loc[:split_date-BDay(1), volume_key] = adjusted_volume.round().astype('int64')
+
         # Currency conversion
         if currency_conversion_df is not None:
             cur_comps_set = set(self.get_current_components())
@@ -957,6 +974,22 @@ class Metrics:
 
         # No matching period found
         return False
+
+    def get_first_entry_last_exit(self, ticker):
+        """
+        Retrieve the first entry date and the last exit date for a ticker as a tuple.
+
+        Args:
+            ticker (str): The ticker symbol to query.
+
+        Returns:
+            tuple: (first_entry, last_exit) where first_entry is the earliest entry date
+                   and last_exit is the most recent exit date (or None if still active).
+        """
+        periods = self.ticker_symbols[ticker]
+        first_entry = periods[0][0]  # Entry date of the first period
+        last_exit = periods[-1][1]  # Exit date of the last period
+        return (first_entry, last_exit)
 
     def get_industry_keys(self):
         """
