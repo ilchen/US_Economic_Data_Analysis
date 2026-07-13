@@ -1835,6 +1835,17 @@ class USStockMarketMetrics(Metrics):
                                                           '2021-10-26', '2022-01-25', '2022-04-26', '2022-08-25',
                                                           '2022-10-27', '2023-01-31', '2023-05-31', '2023-11-30',
                                                           '2024-01-31', '2024-04-25', '2024-10-28']).map(last_bd)),
+                'CTRA': pd.Series([398575510, 398575510, 398579881, 398579881, 399419748, 399419748, 399664181,
+                                   813577639, 813757948, 805805159, 795595177, 788467351, 768258911, 757453231,
+                                   755045540, 752191690, 751847432, 744232925, 739274446, 736613020, 764151477,
+                                   763260740, 763139972, 761377552, 759272715, 759358254],
+                                  index=pd.DatetimeIndex(['2020-02-19', '2020-04-28', '2020-07-29', '2020-10-28',
+                                                          '2021-02-22', '2021-04-28', '2021-07-28', '2021-11-01',
+                                                          '2022-02-24', '2022-05-02', '2022-08-02', '2022-11-02',
+                                                          '2023-02-24', '2023-05-03', '2023-08-04', '2023-11-03',
+                                                          '2024-02-21', '2024-05-01', '2024-07-31', '2024-10-29',
+                                                          '2025-02-14', '2025-04-30', '2025-07-31', '2025-10-30',
+                                                          '2026-02-13', '2026-04-30']).map(last_bd)),
                 'CTXS': pd.Series([123450644, 123123572, 124167045, 124230000, 124722872, 126579926, 126885081],
                                   index=pd.DatetimeIndex(['2020-04-28', '2020-10-23', '2021-04-29', '2021-06-30',
                                                           '2021-11-01', '2022-04-27', '2022-07-18']).map(last_bd)),
@@ -2062,7 +2073,7 @@ class USStockMarketMetrics(Metrics):
             {'ABMD': 'medical-devices', 'AGN': 'drug-manufacturers-general', 'ALXN': 'drug-manufacturers-general',
              'ANSS': 'software-application', 'ATVI': 'electronic-gaming-multimedia',
              'CERN': 'health-information-services', 'CMA': 'banks-regional', 'CTLT': 'diagnostics-research',
-             'CTXS': 'software-application', 'CXO': 'oil-gas-e-p', 'DAY': 'software-application',
+             'CTRA': 'oil-gas-e-p', 'CTXS': 'software-application', 'CXO': 'oil-gas-e-p', 'DAY': 'software-application',
              'DFS': 'credit-services', 'DISCK': 'entertainment', 'DISH': 'entertainment', 'DRE': 'reit-industrial',
              'ETFC': 'capital-markets', 'FISV': 'information-technology-services',
              'FLIR': 'scientific-technical-instruments', 'HBI': 'luxury-goods', 'HES': 'oil-gas-e-p',
@@ -2125,18 +2136,18 @@ class EuropeBanksStockMarketMetrics(Metrics):
     def get_stoxx_europe_banks_components():
         """
         Returns a list of ticker symbols of Stoxx Europe 600 Banks Index.
-        Based on rebalancing in H2 2025, 53 banks
+        Based on rebalancing in H2 2025, 56 banks
         """
         return ['INGA.AS', 'ABN.AS', 'DBK.DE', 'CBK.DE', 'BNP.PA', 'ACA.PA', 'GLE.PA', 'KBC.BR', 'KBCA.BR',
                 'BIRG.IR', 'A5G.IR',
                 'BBVA.MC', 'BKT.MC', 'CABK.MC', 'SAB.MC', 'SAN.MC', 'UNI.MC', 'EBS.VI', 'BG.VI', 'RBI.VI', 'NDA-FI.HE',
                 'ISP.MI', 'UCG.MI', 'FBK.MI', 'BAMI.MI', 'BPE.MI', 'BMPS.MI', 'BGN.MI', 'BCP.LS',
                 'HSBA.L', 'BARC.L', 'LLOY.L', 'NWG.L', 'INVP.L', 'STAN.L', 'BGEO.L', 'TBCG.L',
-                'BCVN.SW', 'CMBN.SW',
+                'BCVN.SW', 'CMBN.SW', 'VATN.SW',
                 'SEB-A.ST', 'SWED-A.ST', 'SHB-A.ST', 'AZA.ST',
                 'DANSKE.CO', 'ALSYDB.CO', 'JYSK.CO', 'RILBA.CO',
-                'DNB.OL', 'SB1NO.OL',
-                'PEO.WA', 'PKO.WA', 'SPL.WA', 'MBK.WA']
+                'DNB.OL', 'SB1NO.OL', 'SBNOR.OL',
+                'PEO.WA', 'PKO.WA', 'EBP.WA', 'MBK.WA', 'ING.WA']
 
 
 class NLStockMarketMetrics(EuropeBanksStockMarketMetrics):
@@ -2193,7 +2204,10 @@ class NLStockMarketMetrics(EuropeBanksStockMarketMetrics):
         on a given reporting date. I populated the missing days by doing a forward fill followed by a backward fill.
         """
         last_bd = BDay(0).rollback
-        return {'TKWY.AS': pd.Series([150056000, 148808992, 211620992, 221134000, 212620992, 214966000, 214966000,
+        return {'JDEP.AS': pd.Series([484637351, 484637351, 484950100, 485020731, 485020731, 485464923],
+                                     index=pd.DatetimeIndex(['2025-09-26', '2025-10-31', '2025-11-17', '2025-12-19',
+                                                             '2026-02-28', '2026-04-07']).map(last_bd)),
+                'TKWY.AS': pd.Series([150056000, 148808992, 211620992, 221134000, 212620992, 214966000, 214966000,
                                       213476000, 15966000, 219966000, 219966000, 228942000, 214407008, 206252000,
                                       205955008, 205955008, 210923008, 197694000, 198302000, 199916234],
                                      index=pd.DatetimeIndex([
@@ -2202,3 +2216,7 @@ class NLStockMarketMetrics(EuropeBanksStockMarketMetrics):
                                          '2022-12-30', '2023-03-31', '2023-06-30', '2023-09-29',
                                          '2023-12-29', '2024-03-28', '2024-06-28', '2024-09-30',
                                          '2024-12-31', '2025-03-31', '2025-06-30', '2025-09-30']).map(last_bd))}
+
+    def get_industry_keys(self):
+        return super().get_industry_keys() | \
+            {'JDEP.AS': 'packaged-foods', 'TKWY.AS': 'internet-retail'}
