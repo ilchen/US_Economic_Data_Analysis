@@ -125,3 +125,22 @@ def plot_contributions_waterfall(df, total_growth, title, total_label="US GDP gr
     sns.despine(left=True, bottom=False)
 
     return fig, ax
+
+def make_ytd_suffix(index: pd.DatetimeIndex) -> str:
+    """
+    Build a YTD suffix string for labels.
+
+    Parameters
+    - index: a pd.DatetimeIndex with a quarterly frequency
+
+    Returns
+    - suffix string like ", YTD (Q1-Q2), %" or ", YTD (Q1), %" or ", in 2025, %"
+    """
+    if not hasattr(index, "__len__") or len(index) == 0:
+        raise ValueError("index must be a non-empty index/sequence")
+    qtd = index[-1].quarter
+
+    suffix = ', ' + (f'YTD (Q{index[-qtd].quarter}-Q{index[-1].quarter})' if 1 < qtd < 4
+                          else f'YTD (Q{index[-qtd].quarter})' if 1 == qtd
+                          else f'in {index[-1].year}') + ', %'
+    return suffix
