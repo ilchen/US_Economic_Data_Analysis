@@ -334,7 +334,8 @@ class BankROEPBPlotter:
         self.geography = geography
 
     def plot(self, roe_pb_df, roe_cutoff=None, pb_cutoff=None,
-             slope_intercept_r_p_value=None, expand_tickers=True, mode: str='current'):
+             slope_intercept_r_p_value=None, expand_tickers=True, mode: str='current',
+             title_date=None):
         """
         Plots Price-to-Book vs ROE for Banks.
 
@@ -439,7 +440,9 @@ class BankROEPBPlotter:
         title = f"Price to Book vs ROE of {self.geography} Banks"
         if roe_cutoff is not None:
             title += f" (subset: {roe_cutoff_min:.0%} < ROE < {roe_cutoff_max:.0%} and P/B < {pb_cutoff})"
-        if self.metrics is not None:
+        if title_date is not None:
+            title += f" on {title_date:%Y-%m-%d}"
+        elif self.metrics is not None:
             title += f" on {self.metrics.capitalization.index[-1]:%Y-%m-%d}"
 
         plt.title(title)
