@@ -1276,7 +1276,8 @@ class Metrics:
                 else:
                     eva = (roic - wacc) * avg_invested_capital
                 # mva = market_debt + market_equity - current_gross_debt - invested_capital
-                mva = market_debt + market_equity - current_gross_debt - current_total_equity
+                # mva = market_debt + market_equity - current_gross_debt - current_total_equity
+                mva = market_debt + market_equity - invested_capital
 
                 # Currency conversion if required
                 currency = ticker.info.get('financialCurrency')
@@ -1811,13 +1812,14 @@ class USStockMarketMetrics(Metrics):
                 'BRK-B': pd.Series([1385994959, 1401356454, 1390707370, 1370951744, 1336348609, 1326572128, 1325373100,
                                     1303476707, 1291212661, 1285751332, 1301126370, 1301981370, 1301100243, 1295970861,
                                     1308070268, 1308414093, 1310805008, 1311384883, 1325192508, 1328446516, 1338051639,
-                                    1342836639, 1378545639],
+                                    1342836639, 1378545639, 1372820139],
                                    index=pd.DatetimeIndex(['2020-02-13', '2020-07-30', '2020-08-23', '2020-10-26',
                                                            '2021-02-16', '2021-04-22', '2021-07-26', '2021-10-27',
                                                            '2022-02-14', '2022-04-20', '2022-07-26', '2022-10-26',
                                                            '2023-02-13', '2023-04-25', '2023-07-26', '2023-10-24',
                                                            '2024-02-12', '2024-04-19', '2024-07-23', '2024-10-21',
-                                                           '2025-02-10', '2025-04-21', '2025-07-21']).map(last_bd)),
+                                                           '2025-02-10', '2025-04-21', '2025-07-21', '2025-10-20'])
+                                   .map(last_bd)),
                 'CERN': pd.Series([311937692, 304348600, 305381551, 306589898, 301317068, 294222760, 294098094],
                                   index=pd.DatetimeIndex(['2020-01-28', '2020-04-23', '2020-07-22', '2020-10-21',
                                                           '2021-04-30', '2021-10-25', '2022-04-26']).map(last_bd)),
