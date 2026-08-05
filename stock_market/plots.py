@@ -335,7 +335,7 @@ class BankROEPBPlotter:
 
     def plot(self, roe_pb_df, roe_cutoff=None, pb_cutoff=None,
              slope_intercept_r_p_value=None, expand_tickers=True, mode: str='current',
-             title_date=None):
+             use_mrqd: bool=False):
         """
         Plots Price-to-Book vs ROE for Banks.
 
@@ -343,6 +343,8 @@ class BankROEPBPlotter:
             'current'  → only large bubbles with current ROE/PB
             'forward'  → only large bubbles with forward ROE/PB
             'both'     → large bubble (current) + smaller bubble (forward) + arrow
+        use_mrqd: if self.metrics != None, it will use the date of the most recent quarter end in the graph
+                  title
         """
         # === VALIDATION ===
         valid_modes = {"current", "forward", "both"}
@@ -440,10 +442,9 @@ class BankROEPBPlotter:
         title = f"Price to Book vs ROE of {self.geography} Banks"
         if roe_cutoff is not None:
             title += f" (subset: {roe_cutoff_min:.0%} < ROE < {roe_cutoff_max:.0%} and P/B < {pb_cutoff})"
-        if title_date is not None:
-            title += f" on {title_date:%Y-%m-%d}"
-        elif self.metrics is not None:
-            title += f" on {self.metrics.capitalization.index[-1]:%Y-%m-%d}"
+        if self.metrics is not None:
+            title += f" on {(pd.offsets.QuarterEnd(0).rollback(self.metrics.data.index[-1]) if use_mrqd
+                else self.metrics.data.index[-1]):%Y-%m-%d}"
 
         plt.title(title)
         x_label = roe_pb_df.columns[0] + x_label_sfx
