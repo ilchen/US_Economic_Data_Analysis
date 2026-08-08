@@ -1,1 +1,1 @@
-from .plots import CapChangePlotter, BankROEPBPlotter
+from .plots import CapChangePlotter, BankROEPBPlotter, display_return_vs_cost_scatter_chart

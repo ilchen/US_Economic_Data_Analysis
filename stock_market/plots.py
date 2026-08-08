@@ -3,6 +3,7 @@ from datetime import datetime
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
+from matplotlib.lines import Line2D
 import numpy as np
 import pandas as pd
 
@@ -469,3 +470,93 @@ class BankROEPBPlotter:
                     if (beta := self.metrics.tickers.tickers[ticker].info.get("beta")) is not None and beta >= 0.1
                     else self.metrics.get_beta([ticker]) ) * 0.05 + rfr).mean()
             print(f"When calculating cost of equity based on their beta to the market, it becomes {coe:.2%}")
+
+
+def display_return_vs_cost_scatter_chart(
+    df: pd.DataFrame,
+    ticker_to_name: dict[str, str],
+    y_col: str = "ROIC",
+    x_col: str = "WACC",
+    num_years: int = 4,
+) -> None:
+    """
+    Generic scatter of average return metric (y) vs average cost-of-capital metric (x).
+
+    Works for both non-banks (ROIC vs WACC) and banks (ROE vs Cost of equity).
+
+    Parameters
+    ----------
+    df : MultiIndex (symbol, year) DataFrame produced by calculate_financial_metrics
+    y_col, x_col : column names for the return and cost metrics
+    num_years : how many most recent years to average
+    """
+    # Calculate num_years-year averages per ticker (use all available years if < num_years)
+    averages = df.groupby(level="symbol").tail(num_years).groupby(level="symbol").mean()
+    # Latest MVA for bubble size
+    latest_mva = df.groupby(level="symbol").last()[["MVA"]]
+
+    # Combine both
+    plot_data = averages.iloc[:, :9].join(latest_mva, how="inner")
+
+    plt.figure(figsize=(12, 8))
+    ax = sns.scatterplot(
+        data=plot_data,
+        x=x_col,
+        y=y_col,
+        hue=plot_data.index,
+        size="MVA",
+        sizes=(40, 600),
+        alpha=0.85,
+        legend=False,
+    )
+    plt.axline((0, 0), slope=1, color="gray", linestyle="--", alpha=0.7, label=f"{y_col} = {x_col}")
+
+    ax.xaxis.set_major_formatter(mtick.PercentFormatter(1, decimals=0))
+    ax.yaxis.set_major_formatter(mtick.PercentFormatter(1))
+
+    # === PROPERLY SCALED $1 TRILLION REFERENCE BUBBLE ===
+    mva_min = plot_data["MVA"].min()
+    mva_max = plot_data["MVA"].max()
+    # Choose a nice round reference value just above the largest MVA (e.g. 500bn when max ≈ 400bn)
+    round_to = 1e12 if mva_max > (mva_min + mva_max) / 2 > 1e12 else 100e9
+    ref_mva = np.floor((mva_min + mva_max) / 2 / round_to) * round_to
+
+    ref_size = 40 + (600 - 40) * (ref_mva - mva_min) / (mva_max - mva_min)
+
+    # Convert seaborn area to matplotlib markersize (approximate)
+    ref_markersize = np.sqrt(ref_size)  # markersize is roughly sqrt of area
+
+    # Create custom legend handles
+    legend_elements = [
+        Line2D(
+            [0],
+            [0],
+            marker="o",
+            color="w",
+            label=f"${ref_mva / 1e9:.0f} Billion MVA",
+            markerfacecolor="gray",
+            markersize=ref_markersize,
+            alpha=0.35,
+        ),
+        Line2D([0], [0], color="gray", linestyle="--", label=f"{y_col} = {x_col}"),
+    ]
+
+    plt.legend(handles=legend_elements, loc="upper left")
+
+    for ticker, row in averages.iterrows():
+        ax.text(
+            row[x_col] + 0.001,
+            row[y_col],
+            ticker_to_name[ticker],
+            fontsize=9,
+            ha="left",
+            va="center",
+        )
+    plt.title(
+        f"{num_years}-Year Average {y_col} vs {num_years}-Year Average {x_col}\n"
+        "(bubble size = Latest MVA)"
+    )
+    plt.xlabel(f"Average {x_col}")
+    plt.ylabel(f"Average {y_col}")
+    plt.tight_layout()
+    plt.grid(True, alpha=0.3)
