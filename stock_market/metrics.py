@@ -209,26 +209,37 @@ class Metrics:
             #     shares_outst = hist_shares_outs[ticker]
 
             else:
-                shares_outst = self.tickers.tickers[ticker].get_shares_full(start=start).tz_localize(None)
-                # Unfortunately Yahoo-Finance occasionally reports duplicate values for shares outstanding
-                # for the same date. In such cases I take the most recent value.
-                shares_outst = shares_outst.groupby(level=0).last()
+                shares_outst = self.tickers.tickers[ticker].get_shares_full(start=start)
+                if shares_outst is None or shares_outst.empty:
+                    if hist_shares_outs is None or ticker not in hist_shares_outs:
+                        raise ValueError(f'No data on shares outstanding for {ticker}')
+                    # A special case where Yahoo Finance doesn't report any shares outstanding for a valid ticker
+                    shares_outst = hist_shares_outs[ticker]
+                else:
+                    shares_outst = shares_outst.tz_localize(None)
+                    # Unfortunately Yahoo-Finance occasionally reports duplicate values for shares outstanding
+                    # for the same date. In such cases I take the most recent value.
+                    shares_outst = shares_outst.groupby(level=0).last()
+    
+                    # Correction for the shares outstanding for companies that have multiple classes of shares that
+                    # are listed, e.g. Alphabet's Class A 'GOOGL' and Class C 'GOOG' stocks or 'BRK-A' and 'BRK-B'
+                    shares_outstanding = self.tickers.tickers[ticker].info.get('sharesOutstanding')
+    
+                    # Check if shares_outstanding is valid and significantly lower than the latest reported value
+                    if shares_outstanding and shares_outstanding * 1.2 < shares_outst.iloc[-1].item():
+                        shares_outstanding2 = self.tickers.tickers[ticker].info.get('impliedSharesOutstanding')\
+                                              or shares_outst.iloc[-1].item()
+                        print('Correcting the number of shares outstanding for {:s} from {:d} to {:d}'
+                              .format(ticker, shares_outst.iloc[-1].item(),
+                                      int(shares_outst.iloc[-1].item() * shares_outstanding / shares_outstanding2)))
+    
+                        shares_outst *= shares_outstanding / float(shares_outstanding2)
+                        shares_outst = shares_outst.astype('int64')
 
-                # Correction for the shares outstanding for companies that have multiple classes of shares that
-                # are listed, e.g. Alphabet's Class A 'GOOGL' and Class C 'GOOG' stocks or 'BRK-A' and 'BRK-B'
-                shares_outstanding = self.tickers.tickers[ticker].info.get('sharesOutstanding')
-                if shares_outstanding and shares_outstanding * 1.2 < shares_outst.iloc[-1].item():
-                    shares_outstanding2 = self.tickers.tickers[ticker].info.get('impliedSharesOutstanding')\
-                                          or shares_outst.iloc[-1].item()
-                    print('Correcting the number of shares outstanding for {:s} from {:d} to {:d}'
-                          .format(ticker, shares_outst.iloc[-1].item(),
-                                  int(shares_outst.iloc[-1].item() * shares_outstanding / shares_outstanding2)))
-
-                    shares_outst *= shares_outstanding / float(shares_outstanding2)
-                    shares_outst = shares_outst.astype('int64')
-
-                # Correcting for shares outstanding based ont he override in hist_shares_outs
-                if hist_shares_outs is not None and ticker in hist_shares_outs:
+                # Correcting for shares outstanding based on the override in hist_shares_outs (if any).
+                # Only doing it Yahoo Finance reports a non-None shares outstanding.
+                if hist_shares_outs is not None and ticker in hist_shares_outs\
+                        and shares_outst is not hist_shares_outs[ticker]:
                     correction = hist_shares_outs[ticker]
                     missing_dates_back = shares_outst.loc[:correction.index[-1]].index.difference(correction.index)
                     missing_dates_back = missing_dates_back.union(
@@ -356,8 +367,8 @@ class Metrics:
         self.validate_method(method)
         ret = defaultdict(lambda: pd.Series(0., index=self.capitalization.index))
         for ticker in self.ticker_symbols:
-            industry_key = self.tickers.tickers[ticker]\
-                .info.get('industryKey', self.get_industry_keys().get(ticker, self.UNIDENTIFIED_SECTOR))
+            raw = self.tickers.tickers[ticker].info.get('industryKey')
+            industry_key = raw if raw else self.get_industry_keys().get(ticker, Metrics.UNIDENTIFIED_SECTOR)
             ret[industry_key] = ret[industry_key].add(self.capitalization.loc[:, ticker], fill_value=0)
         ret = pd.DataFrame(ret).sort_index(axis=1)
 
@@ -907,8 +918,8 @@ class Metrics:
         sectors_dict = self.get_sector_keys()
         for ticker in self.ticker_symbols.keys():
             if not self.is_ticker_in_market(ticker, dt): continue
-            sector_key = self.tickers.tickers[ticker].info.get('sectorKey',
-                                                               sectors_dict.get(ticker, Metrics.UNIDENTIFIED_SECTOR))
+            raw = self.tickers.tickers[ticker].info.get('sectorKey')
+            sector_key = raw if raw else sectors_dict.get(ticker, Metrics.UNIDENTIFIED_SECTOR)
             ret[sector_key] += self.capitalization.loc[dt, ticker]
 
         return pd.Series(ret) / self.capitalization.loc[dt, Metrics.CAPITALIZATION]
@@ -2044,6 +2055,17 @@ class USStockMarketMetrics(Metrics):
                 'VAR': pd.Series([90814945, 90941138, 91355469, 91838813],
                                  index=pd.DatetimeIndex(['2020-05-01', '2020-07-31', '2020-11-13',
                                                          '2021-01-29']).map(last_bd)),
+                'VMRK': pd.Series([371978449, 372125616, 372125616, 372253249, 372663215, 374005379, 374005379,
+                                   375016222, 375917242, 376041849, 376118260, 377918920, 378602684, 378904669,
+                                   379032411, 379724934, 379553591, 378971999, 379135883, 379429476, 379705225,
+                                   379943670, 381898057, 377547108, 374671735, 374944409, 774940000],
+                                  index=pd.DatetimeIndex(['2020-02-14', '2020-04-30', '2020-07-28', '2020-10-27',
+                                                          '2021-02-12', '2021-04-26', '2021-07-23', '2021-10-22',
+                                                          '2022-02-11', '2022-04-22', '2022-07-22', '2022-10-21',
+                                                          '2023-02-10', '2023-04-21', '2023-07-26', '2023-10-26',
+                                                          '2024-02-08', '2024-04-25', '2024-07-25', '2024-10-28',
+                                                          '2025-02-06', '2025-04-24', '2025-07-31', '2026-02-06',
+                                                          '2026-04-24', '2026-07-24', '2026-08-18']).map(last_bd)),
                 'WBA': pd.Series([880397199, 870178709, 866500000, 863901817, 864200000, 864882399, 865100000,
                                   863272027, 863773464, 864256651, 864500000, 862503554, 862600000, 863261413,
                                   862166970, 862500000, 863275037, 863700000, 864153468, 864737898, 865560675],
@@ -2086,7 +2108,8 @@ class USStockMarketMetrics(Metrics):
              'PBCT': 'banks-regional', 'PXD': 'oil-gas-e-p', 'RTN': 'aerospace-defense', 'SBNY': 'banks-regional',
              'SEE': 'packaging-containers',
              'SIVB': 'banks-regional', 'TIF': 'luxury-goods', 'TWTR': 'internet-content-information',
-             'VAR': 'medical-instruments-supplies', 'WBA': 'pharmaceutical-retailers', 'WCG': 'healthcare-plans',
+             'VAR': 'medical-instruments-supplies', 'VMRK': 'reit-residential', 'WBA': 'pharmaceutical-retailers',
+             'WCG': 'healthcare-plans',
              'WRK': 'packaging-containers', 'XEC': 'oil-gas-e-p', 'XLNX': 'semiconductors'
              }
 
