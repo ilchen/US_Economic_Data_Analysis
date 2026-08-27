@@ -10,6 +10,31 @@ import matplotlib.pyplot as plt
 from IPython.display import display
 
 
+def _infer_lag_unit(series: pd.Series) -> str:
+    """
+    Infer a human-readable lag unit from the index frequency.
+    Falls back to 'periods' if the frequency cannot be determined.
+    """
+    if not isinstance(series.index, pd.DatetimeIndex):
+        return 'periods'
+
+    freq = series.index.freqstr or pd.infer_freq(series.index)
+    if freq is None:
+        return 'periods'
+
+    if freq.startswith(('Q', 'QS', 'QE', 'Q-')):
+        return 'quarters'
+    if freq.startswith(('M', 'MS', 'ME', 'M-')):
+        return 'months'
+    if freq.startswith(('A', 'AS', 'Y', 'YS', 'YE')):
+        return 'years'
+    if freq.startswith(('W', 'W-')):
+        return 'weeks'
+    if freq.startswith(('D', 'B')):
+        return 'days'
+    return 'periods'
+
+
 def lag_corr_stats(x: pd.Series, y: pd.Series, max_lag: int = 21) -> pd.DataFrame:
     """
     For each lag k = 0 … max_lag compute:
@@ -49,12 +74,16 @@ def lag_corr_stats(x: pd.Series, y: pd.Series, max_lag: int = 21) -> pd.DataFram
             'slope': slope,
             'n_obs': n
         })
-    return pd.DataFrame(rows).set_index('lag')
+
+    df = pd.DataFrame(rows).set_index('lag')
+    unit = _infer_lag_unit(x)
+    df.index.name = f'lag (in {unit})'
+    return df
 
 
 def plot_lag_correlation(x: pd.Series, y: pd.Series, max_lag: int = 21,
                          figsize: tuple = (12, 6), show_table: bool = True,
-                         title: str = None, xlabel: str = None, ylabel: str = None):
+                         title: str = None, ylabel: str = None):
     """
     Compute lag correlations, optionally show a styled table,
     and plot the coefficients with Fisher-z confidence bands.
@@ -79,13 +108,12 @@ def plot_lag_correlation(x: pd.Series, y: pd.Series, max_lag: int = 21,
         title = (f'Correlation between {x.name or "x"} and {y.name or "y"} '
                  f'({x.index[0].year}–{x.index[-1].year})')
 
-    ax = lag_stats['corr'].plot(figsize=figsize, grid=True,
-                                title=title,
+    ax = lag_stats['corr'].plot(figsize=figsize, grid=True, ctitle=title,
                                 ylabel=ylabel or 'Coefficient of correlation',
                                 label='Pearson corr')
     ax.fill_between(lag_stats.index,
-                     lag_stats['ci_low'], lag_stats['ci_high'],
-                     alpha=0.25, label='approx. 95 % CI (Fisher z)')
+                    lag_stats['ci_low'], lag_stats['ci_high'],
+                    alpha=0.25, label='approx. 95 % CI (Fisher z)')
     ax.axhline(0, color='k', lw=0.8)
     ax.legend()
 
