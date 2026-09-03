@@ -336,7 +336,7 @@ class BankROEPBPlotter:
 
     def plot(self, roe_pb_df, roe_cutoff=None, pb_cutoff=None,
              slope_intercept_r_p_value=None, expand_tickers=True, mode: str='current',
-             use_mrqd: bool=False):
+             use_mrqd: bool=False, forward_horizon: int=0):
         """
         Plots Price-to-Book vs ROE for Banks.
 
@@ -346,6 +346,7 @@ class BankROEPBPlotter:
             'both'     → large bubble (current) + smaller bubble (forward) + arrow
         use_mrqd: if self.metrics != None, it will use the date of the most recent quarter end in the graph
                   title
+        forward_horizon: in case mode in ['forward', 'both'] indicates for the end of which year forward ROE and P/B belong to
         """
         # === VALIDATION ===
         valid_modes = {"current", "forward", "both"}
@@ -356,7 +357,9 @@ class BankROEPBPlotter:
 
         if roe_cutoff:
             roe_cutoff_min, roe_cutoff_max = roe_cutoff
-            roe_pb_df = roe_pb_df.loc[(roe_pb_df.ROE < roe_cutoff_max) & (roe_pb_df.ROE > roe_cutoff_min) & (roe_pb_df["P/B"] < pb_cutoff)]
+            roe_col, pb_col = ('ROE', 'P/B') if mode == 'current' else ('Forward ROE', 'Forward P/B')
+            roe_pb_df = roe_pb_df.loc[(roe_pb_df[roe_col] < roe_cutoff_max) & (roe_pb_df[roe_col] > roe_cutoff_min)
+                                      & (roe_pb_df[pb_col] < pb_cutoff)]
 
         # Determine which ROE and P/B to use for the main regression line
         if mode in ['forward', 'both']:
@@ -437,8 +440,13 @@ class BankROEPBPlotter:
                                                    facecolor="white", alpha=0.95, edgecolor="gray"))
 
         # Titles / labels
-        x_label_sfx = {"current": " (ttm)", "forward": " (forward)", "both": " (ttm and forward)"}[mode]
-        y_label_sfx = {"current": " (mrq)", "forward": " (forward)", "both": " (mrq and forward)"}[mode]
+        if self.metrics is not None:
+            ye = pd.offsets.YearEnd(0).rollforward(self.metrics.data.index[-1]).year + forward_horizon
+            inner_sfx = f' YE {ye}'
+        else:
+            inner_sfx = ''
+        x_label_sfx = {"current": " (ttm)", "forward": f" (forward{inner_sfx})", "both": f" (ttm and forward{inner_sfx})"}[mode]
+        y_label_sfx = {"current": " (mrq)", "forward": f" (forward{inner_sfx})", "both": f" (mrq and forward{inner_sfx})"}[mode]
 
         title = f"Price to Book vs ROE of {self.geography} Banks"
         if roe_cutoff is not None:

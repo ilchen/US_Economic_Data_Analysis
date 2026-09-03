@@ -819,60 +819,121 @@ class Metrics:
                     except (KeyError, IndexError):
                         pass
 
-            # === FORWARD ROE ===
+            # ------------------------------------------------------------------
+            # Forward ROE & Forward P/B
+            # ------------------------------------------------------------------
             try:
                 earnings_est = t.get_earnings_estimate()
 
-                # Get earnings estimates
-                eps_current = None
-                eps_target = None
+                eps_0y = (earnings_est.loc["0y", "avg"]
+                          if "0y" in earnings_est.index else None)
+                eps_target = (earnings_est.loc[target_period, "avg"]
+                              if target_period in earnings_est.index else None)
 
-                if "0y" in earnings_est.index:
-                    eps_current = earnings_est.loc["0y", "avg"]
-                if target_period in earnings_est.index:
-                    eps_target = earnings_est.loc[target_period, "avg"]
+                if pd.isna(eps_target) or eps_target == 0:
+                    continue
 
-                if pd.notna(eps_target) and eps_target != 0:
-                    # Last reported book value per share (beginning of current year)
-                    book_value_begin = info.get('bookValue', 0.0)
-                    if pd.isna(book_value_begin):
-                        book_value_begin = 0.0
+                # --------------------------------------------------------------
+                # 1. Reliable beginning-of-current-fiscal-year BVPS (BV₀)
+                # --------------------------------------------------------------
+                BV0 = None
+                shares_series = self.shares_outstanding.get(ticker)
 
-                    payout_ratio = info.get('payoutRatio', 0.0)
-                    if pd.isna(payout_ratio):
-                        payout_ratio = 0.0
+                bs = t.balance_sheet
+                if bs is not None and not bs.empty\
+                        and shares_series is not None and not shares_series.empty:
 
-                    # Step 1: Project book value at end of current year
-                    retained_current = eps_current * (1 - payout_ratio) if pd.notna(eps_current) else 0.0
-                    book_value_end_current = book_value_begin + retained_current
+                    equity_candidates = [
+                        'Stockholders Equity',
+                        'Total Stockholders Equity',
+                        'Common Stock Equity',
+                        'Total Equity Gross Minority Interest',
+                        'Total Equity'
+                    ]
+                    equity_row = next((r for r in equity_candidates if r in bs.index), None)
 
-                    # Step 2: For next year, use end-of-current as beginning
-                    if target_period == "+1y":
-                        book_value_begin_next = book_value_end_current
-                    else:
-                        book_value_begin_next = book_value_begin
+                    if equity_row is not None:
+                        last_fy_end = info.get('lastFiscalYearEnd')
+                        col = None
 
-                    # Step 3: Project book value at end of target year
-                    retained_target = eps_target * (1 - payout_ratio)
-                    book_value_end_target = book_value_begin_next + retained_target
+                        if last_fy_end is not None:
+                            last_fy_end = pd.Timestamp(last_fy_end).normalize()
+                            cols = pd.DatetimeIndex(bs.columns)
+                            # Accept a column within ±15 days of the reported FY end
+                            candidates = cols[(cols >= last_fy_end - pd.Timedelta(days=15)) &
+                                              (cols <= last_fy_end + pd.Timedelta(days=15))]
+                            if len(candidates) > 0:
+                                col = candidates[-1]  # most recent acceptable
+                            else:
+                                # nearest column that is not after the FY end
+                                earlier = cols[cols <= last_fy_end + pd.Timedelta(days=15)]
+                                if len(earlier) > 0:
+                                    col = earlier[-1]
 
-                    # Step 4: Average book equity for the target year
-                    avg_book_equity = (book_value_begin_next + book_value_end_target) / 2
+                        # Fallback: second-most-recent annual column
+                        # (normally the prior year-end when the latest column is still intra-year)
+                        if col is None and len(bs.columns) >= 2:
+                            col = bs.columns[1]
 
-                    # Step 5: Forward ROE
-                    if avg_book_equity > 0:
-                        forward_roe = eps_target / avg_book_equity
-                        ret.loc[ticker, 'Forward ROE'] = forward_roe
+                        if col is not None:
+                            equity = bs.loc[equity_row, col]
+                            if pd.notna(equity):
+                                # Look up shares outstanding on (or nearest to) that date
+                                # from the class’s already-cleaned historical series
+                                try:
+                                    # Exact match or nearest prior trading day
+                                    if col in shares_series.index:
+                                        shares = shares_series.loc[col]
+                                    else:
+                                        # asof / nearest previous
+                                        shares = shares_series.asof(col)
+                                    if pd.notna(shares) and shares > 0:
+                                        BV0 = float(equity) / float(shares)
+                                except Exception:
+                                    pass
 
-                    # Step 6: Forward P/B
-                    market_price = info.get('currentPrice') or info.get('regularMarketPrice')
-                    if ticker.endswith('.L'):
-                        market_price /= 100.
-                    if pd.notna(market_price) and market_price > 0:
-                        ret.loc[ticker, 'Forward P/B'] = market_price / book_value_end_target
+                # Ultimate fallback – only safe early in the fiscal year
+                if BV0 is None or pd.isna(BV0) or BV0 <= 0:
+                    BV0 = info.get('bookValue', 0.0) or 0.0
+                    if pd.isna(BV0):
+                        BV0 = 0.0
+
+                payout = info.get('payoutRatio', 0.0) or 0.0
+                if pd.isna(payout):
+                    payout = 0.0
+
+                # --------------------------------------------------------------
+                # 2. Clean-surplus projection – correct branching for both horizons
+                # --------------------------------------------------------------
+                retained_0y = (eps_0y * (1.0 - payout)) if pd.notna(eps_0y) else 0.0
+                BV_end_current = BV0 + retained_0y
+
+                if target_period == "0y":
+                    BV_begin_target = BV0
+                    retained_target = retained_0y
+                else:  # "+1y"
+                    BV_begin_target = BV_end_current
+                    retained_target = eps_target * (1.0 - payout)
+
+                BV_end_target = BV_begin_target + retained_target
+
+                # --------------------------------------------------------------
+                # 3. Forward ROE (average equity) and Forward P/B
+                # --------------------------------------------------------------
+                avg_BV = (BV_begin_target + BV_end_target) / 2.0
+                if avg_BV > 0:
+                    ret.loc[ticker, 'Forward ROE'] = eps_target / avg_BV
+
+                price = info.get('currentPrice') or info.get('regularMarketPrice')
+                if ticker.endswith('.L') and price is not None:
+                    price = price / 100.0
+
+                if pd.notna(price) and price > 0 and BV_end_target > 0:
+                    ret.loc[ticker, 'Forward P/B'] = price / BV_end_target
 
             except Exception:
-                pass  # Leave as NaN if any data is missing
+                # Leave Forward ROE / Forward P/B as NaN
+                pass
 
         return ret
 
