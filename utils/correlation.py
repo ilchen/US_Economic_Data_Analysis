@@ -108,7 +108,7 @@ def plot_lag_correlation(x: pd.Series, y: pd.Series, max_lag: int = 21,
         title = (f'Correlation between {x.name or "x"} and {y.name or "y"} '
                  f'({x.index[0].year}–{x.index[-1].year})')
 
-    ax = lag_stats['corr'].plot(figsize=figsize, grid=True, ctitle=title,
+    ax = lag_stats['corr'].plot(figsize=figsize, grid=True, title=title,
                                 ylabel=ylabel or 'Coefficient of correlation',
                                 label='Pearson corr')
     ax.fill_between(lag_stats.index,
