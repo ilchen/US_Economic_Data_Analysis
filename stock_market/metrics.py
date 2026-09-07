@@ -857,7 +857,7 @@ class Metrics:
                         col = None
 
                         if last_fy_end is not None:
-                            last_fy_end = pd.Timestamp(last_fy_end).normalize()
+                            last_fy_end = pd.Timestamp(last_fy_end, unit='s').normalize()
                             cols = pd.DatetimeIndex(bs.columns)
                             # Accept a column within ±15 days of the reported FY end
                             candidates = cols[(cols >= last_fy_end - pd.Timedelta(days=15)) &
