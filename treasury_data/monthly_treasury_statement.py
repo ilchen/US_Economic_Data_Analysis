@@ -1,4 +1,5 @@
 from enum import Enum
+from datetime import date
 
 import requests
 
@@ -79,7 +80,7 @@ class MTS:
             # Convert into an appropriately named pd.Series object
             return df.loc[:, 'current_month_rcpt_outly_amt'].rename(MTS.CLASSIFICATION_DESC_NET_INTEREST).astype('float64')
         else:
-            raise KeyError(f'Date range [{start_date}; {end_date}] not present in the dataset.')
+            raise KeyError(f'Date range [{self.start_date}; {self.end_date}] not present in the dataset.')
 
     def retrieve_avg_interest(self, security_type):
         """
@@ -134,4 +135,65 @@ class MTS:
             return ret if len(security_type) > 1 else ret.squeeze()
             
         else:
-            raise KeyError(f'Date range [{start_date}; {end_date}] not present in the dataset.')
+            raise KeyError(f'Date range [{self.start_date}; {self.end_date}] not present in the dataset.')
+
+
+class MSPD:
+    """
+    Monthly Statement of the Public Debt (MSPD) data from the U.S. Department of the Treasury.
+    """
+
+    BASE_URL = 'https://api.fiscaldata.treasury.gov/services/api/fiscal_service'
+    TABLE_1_ENDPOINT = '/v1/debt/mspd/mspd_table_1'
+
+    def __init__(self, start, end=None):
+        """
+        Constructs an MSPD object bound to the specified reporting data range.
+
+        :param start: a date of the first month for which data needs to be obtained
+        :param end: a date of the last month for which data needs to be obtained
+        """
+        self.start_date = MonthBegin().rollback(start).date()
+        self.end_date = (MonthEnd().rollforward(end) if end is not None
+                         else MonthEnd().rollforward(date.today())).date()
+
+    def _retrieve_mspd_aggregate(self, amount_field: str, series_name: str) -> pd.Series:
+        """Internal helper for the Total Public Debt Outstanding aggregate row."""
+        params = {
+            'filter': (f'record_date:gte:{self.start_date},'
+                       f'record_date:lte:{self.end_date},'
+                       f'security_type_desc:eq:Total Public Debt Outstanding'),
+            'fields': f'record_date,{amount_field}',
+            'page[size]': 10000,
+            'sort': 'record_date',
+        }
+
+        response = requests.get(self.BASE_URL + self.TABLE_1_ENDPOINT, params=params)
+        response.raise_for_status()
+        data = response.json()
+
+        if not data.get('data'):
+            raise KeyError(
+                f'Date range [{self.start_date}; {self.end_date}] not present in the MSPD dataset.'
+            )
+
+        df = pd.DataFrame(data['data'])
+        df['record_date'] = pd.to_datetime(df['record_date'])
+
+        s = (df.set_index('record_date')[amount_field]
+               .astype('float64')
+               .sort_index()
+               .rename(series_name))
+        return s.asfreq('ME')
+
+    def retrieve_debt_held_by_public(self) -> pd.Series:
+        """Debt Held by the Public (maps to FRED FYGFDPUN)."""
+        return self._retrieve_mspd_aggregate(
+            'debt_held_public_mil_amt', 'Debt Held by the Public'
+        )
+
+    def retrieve_total_public_debt(self) -> pd.Series:
+        """Total Public Debt Outstanding (maps to FRED GFDEBTN)."""
+        return self._retrieve_mspd_aggregate(
+            'total_mil_amt', 'Total Public Debt Outstanding'
+        )
