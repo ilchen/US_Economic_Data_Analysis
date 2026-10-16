@@ -1,5 +1,6 @@
 import pandas as pd
 
+
 def show_monthly(df, rows=None, fmt='%Y-%m'):
     """
     Display a monthly DataFrame with a clean 'Month' index.
@@ -8,6 +9,22 @@ def show_monthly(df, rows=None, fmt='%Y-%m'):
     out = df.copy()
     out.index = out.index.strftime(fmt)
     out.index.name = 'Month'
+    if rows is not None:
+        out = out.tail(rows) if isinstance(rows, int) else out.loc[rows]
+    return out
+
+
+def show_quarterly(df, rows=None, fmt='{q.year}-Q{q.quarter}'):
+    """
+    Display a quarterly DataFrame/Series with a clean 'Quarter' index.
+    Default format produces labels such as 2026Q3.
+    """
+    out = df.copy()
+    if isinstance(out.index, pd.DatetimeIndex):
+        periods = out.index.to_period('Q')
+        out.index = pd.Index([fmt.format(q=p) for p in periods], name='Quarter')
+    else:
+        out.index.name = 'Quarter'
     if rows is not None:
         out = out.tail(rows) if isinstance(rows, int) else out.loc[rows]
     return out
