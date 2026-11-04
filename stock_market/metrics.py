@@ -397,7 +397,8 @@ class Metrics:
     def adjust_for_additional_share_classes(self, cap_series):
         for additional_share_class, main_share_class in self.additional_share_classes.items():
             cap_series.loc[main_share_class] += cap_series.loc[additional_share_class]
-            cap_series.drop(additional_share_class, inplace=True)
+            cap_series = cap_series.drop(additional_share_class)
+        return cap_series
 
     def get_capitalization_for_companies(self, tickers, frequency='ME', method='mean',
                                          merge_additional_share_classes=True):
@@ -454,7 +455,7 @@ class Metrics:
         cap_series = self.capitalization.loc[dt, self.capitalization.columns[2:]]
         if merge_additional_share_classes and len(self.additional_share_classes) > 0:
             cap_series = cap_series.copy()
-            self.adjust_for_additional_share_classes(cap_series)
+            cap_series = self.adjust_for_additional_share_classes(cap_series)
 
         topn = cap_series.nlargest(n).to_frame(self.CAPITALIZATION)
         topn[self.MKT_SHARE] = topn.iloc[:, 0] / self.capitalization.loc[dt, self.CAPITALIZATION]
@@ -485,7 +486,7 @@ class Metrics:
         resampled_cap = self.capitalization.resample('MS').agg(method)
         cap_series = resampled_cap.loc[dt, resampled_cap.columns[2:]]
         if merge_additional_share_classes and len(self.additional_share_classes) > 0:
-            self.adjust_for_additional_share_classes(cap_series)
+            cap_series = self.adjust_for_additional_share_classes(cap_series)
         topn = cap_series.nlargest(n).to_frame(self.CAPITALIZATION)
         topn[self.MKT_SHARE] = topn.iloc[:, 0] / resampled_cap.loc[dt, self.CAPITALIZATION]
         return topn
@@ -514,7 +515,7 @@ class Metrics:
         resampled_cap = self.capitalization.resample('YS').agg(method)
         cap_series = resampled_cap.loc[dt, resampled_cap.columns[2:]]
         if merge_additional_share_classes and len(self.additional_share_classes) > 0:
-            self.adjust_for_additional_share_classes(cap_series)
+            cap_series = self.adjust_for_additional_share_classes(cap_series)
         topn = cap_series.nlargest(n).to_frame(self.CAPITALIZATION)
         topn[self.MKT_SHARE] = topn.iloc[:, 0] / resampled_cap.loc[dt, self.CAPITALIZATION]
         return topn
